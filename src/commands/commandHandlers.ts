@@ -1,13 +1,17 @@
 import * as vscode from 'vscode';
 import {
 	addHardwareAlias,
+	addModuleInstance,
 	addRepoEntry,
 	addSourceEntry,
 	checkCliPrerequisites,
+	createModuleWizard,
 	deleteHardwareAlias,
+	deleteModuleInstance,
 	deleteRepo,
 	deleteSource,
 	editHardwareAlias,
+	editModuleInstance,
 	editRepoName,
 	editRepoVersion,
 	editSourceMirror,
@@ -50,6 +54,10 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 		vscode.commands.registerCommand('xrobot.refreshAll', () => {
 			refreshAll();
 		}),
+		vscode.commands.registerCommand('xrobot.collapseAllViews', async () => {
+			await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
+			await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');
+		}),
 	);
 
 	context.subscriptions.push(
@@ -70,6 +78,22 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	context.subscriptions.push(
 		vscode.commands.registerCommand('xrobot.editYamlScalar', async (filePath: string, keyPath: Array<string | number>) => {
 			await editYamlScalar(filePath, keyPath);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.createModuleWizard', async () => {
+			await createModuleWizard();
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.addModuleInstance', async () => {
+			await addModuleInstance();
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.editModuleInstance', async (index: number) => {
+			await editModuleInstance(index);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.deleteModuleInstance', async (index: number) => {
+			await deleteModuleInstance(index);
 			refreshAll();
 		}),
 	);

@@ -64,6 +64,10 @@
         "title": "XRobot: Refresh All"
       },
       {
+        "command": "xrobot.collapseAllViews",
+        "title": "XRobot: Collapse All Views"
+      },
+      {
         "command": "xrobot.pickLibxrConfigPath",
         "title": "XRobot: Pick LibXR Config Path"
       },
@@ -78,6 +82,22 @@
       {
         "command": "xrobot.editYamlScalar",
         "title": "XRobot: Edit YAML Scalar"
+      },
+      {
+        "command": "xrobot.createModuleWizard",
+        "title": "XRobot: Create Module Wizard"
+      },
+      {
+        "command": "xrobot.addModuleInstance",
+        "title": "XRobot: Add Module Instance"
+      },
+      {
+        "command": "xrobot.editModuleInstance",
+        "title": "XRobot: Edit Module Instance"
+      },
+      {
+        "command": "xrobot.deleteModuleInstance",
+        "title": "XRobot: Delete Module Instance"
       },
       {
         "command": "xrobot.addRepo",
@@ -129,6 +149,14 @@
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "xrobot.collapseAllViews",
+          "when": "view == xrobot.libxrView || view == xrobot.xrobotView",
+          "group": "navigation",
+          "icon": "$(collapse-all)"
+        }
+      ],
       "view/item/context": [
         {
           "command": "xrobot.pickLibxrConfigPath",

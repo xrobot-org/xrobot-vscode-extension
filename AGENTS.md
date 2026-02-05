@@ -23,6 +23,28 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
 - Prefer semantic text over ambiguous placeholders.
   - Mirror missing => `not a mirror source`
   - Repo version missing => `default branch latest`
+- For XRobot module/source operations, prefer pip CLI commands whenever possible:
+  - add repo: `xrobot_add_mod ...`
+  - add source: `xrobot_src_man add-source ...`
+  - use direct YAML write only when no equivalent CLI subcommand exists (edit/delete fallback)
+- Actions should avoid duplicating GUI edit capabilities.
+- Tree views default to collapsed at startup; support one-click collapse-all.
+- LibXR actions prioritize STM32 flow (`*.ioc` detected) and avoid requiring `config.yaml` in workspace.
+- Current Workspace supports editing selected `xrobot` config values (e.g. `global_settings.monitor_sleep_ms`) and module instance add/edit/delete.
+  - Add instance should prefer pip CLI (`xrobot_add_mod <ModuleName> --config <current config>`).
+- Current Workspace UI uses one merged `Current Config: <path>` section containing editable global settings and instances.
+- Auto-regenerate behavior:
+  - Editing LibXR config or hardware aliases triggers `xr_gen_code_stm32` with current configured paths.
+  - Editing XRobot config/instances triggers `xrobot_gen_main --config <current xrobot config>`.
+- Add repo should prefer candidates discovered from current sources via `xrobot_src_man list`.
+- Startup diagnostics must check `git`, `python`, `pip`, and pip packages `xrobot`/`libxr`, and report missing dependencies in the `XRobot` output channel.
+- LibXR view gating:
+  - unsupported platform => show unsupported only
+  - STM32 but missing libxr yaml => show platform + `xr_cubemx_cfg.exe -d .` action only
+  - STM32 + libxr yaml present => show full LibXR panels/actions
+- XRobot view gating:
+  - missing current xrobot yaml => show only `xrobot_setup` action
+- UX ordering rule: in each peer list/group, place `add ...` operations before existing items for faster access in long lists.
 
 ## High-Risk Areas
 - YAML write-back paths:

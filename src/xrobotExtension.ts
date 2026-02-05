@@ -11,10 +11,15 @@ export function activate(context: vscode.ExtensionContext): void {
 		xrobotProvider.refresh();
 	};
 
-	context.subscriptions.push(
-		vscode.window.registerTreeDataProvider('xrobot.libxrView', libxrProvider),
-		vscode.window.registerTreeDataProvider('xrobot.xrobotView', xrobotProvider),
-	);
+	const libxrView = vscode.window.createTreeView('xrobot.libxrView', {
+		treeDataProvider: libxrProvider,
+		showCollapseAll: true,
+	});
+	const xrobotView = vscode.window.createTreeView('xrobot.xrobotView', {
+		treeDataProvider: xrobotProvider,
+		showCollapseAll: true,
+	});
+	context.subscriptions.push(libxrView, xrobotView);
 
 	registerXrobotCommands(context, refreshAll);
 	registerWatchers(context, refreshAll);
