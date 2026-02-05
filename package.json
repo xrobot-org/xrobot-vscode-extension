@@ -4,6 +4,11 @@
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xrobot-org/xrobot-vscode-extension"
+  },
+  "homepage": "https://xrobot-org.github.io/",
   "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.108.0"
