@@ -1,8 +1,10 @@
 {
   "name": "xrobot",
+  "publisher": "3dd577d7-8b5a-6e9f-b083-750845c9772e",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.108.0"
   },
