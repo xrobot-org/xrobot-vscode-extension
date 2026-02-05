@@ -1,0 +1,205 @@
+{
+  "name": "xrobot",
+  "displayName": "XRobot",
+  "description": "VS Code extension for XRobot",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.108.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:xrobot.helloWorld",
+    "onView:xrobot.libxrView",
+    "onView:xrobot.xrobotView"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "xrobot",
+          "title": "XRobot",
+          "icon": "media/xrobot.svg"
+        }
+      ]
+    },
+    "views": {
+      "xrobot": [
+        {
+          "id": "xrobot.libxrView",
+          "name": "LibXR"
+        },
+        {
+          "id": "xrobot.xrobotView",
+          "name": "XRobot"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "xrobot.helloWorld",
+        "title": "XRobot: Hello World"
+      },
+      {
+        "command": "xrobot.runCli",
+        "title": "XRobot: Run CLI"
+      },
+      {
+        "command": "xrobot.openFile",
+        "title": "XRobot: Open File"
+      },
+      {
+        "command": "xrobot.openUrl",
+        "title": "XRobot: Open URL"
+      },
+      {
+        "command": "xrobot.refreshAll",
+        "title": "XRobot: Refresh All"
+      },
+      {
+        "command": "xrobot.pickLibxrConfigPath",
+        "title": "XRobot: Pick LibXR Config Path"
+      },
+      {
+        "command": "xrobot.pickLibxrAppMainPath",
+        "title": "XRobot: Pick LibXR App Main Path"
+      },
+      {
+        "command": "xrobot.pickXrobotConfigPath",
+        "title": "XRobot: Pick XRobot Config Path"
+      },
+      {
+        "command": "xrobot.editYamlScalar",
+        "title": "XRobot: Edit YAML Scalar"
+      },
+      {
+        "command": "xrobot.addRepo",
+        "title": "XRobot: Add Repo"
+      },
+      {
+        "command": "xrobot.editRepoName",
+        "title": "XRobot: Edit Repo Name"
+      },
+      {
+        "command": "xrobot.editRepoVersion",
+        "title": "XRobot: Edit Repo Version"
+      },
+      {
+        "command": "xrobot.deleteRepo",
+        "title": "XRobot: Delete Repo"
+      },
+      {
+        "command": "xrobot.addSource",
+        "title": "XRobot: Add Source"
+      },
+      {
+        "command": "xrobot.editSourceUrl",
+        "title": "XRobot: Edit Source URL"
+      },
+      {
+        "command": "xrobot.editSourcePriority",
+        "title": "XRobot: Edit Source Priority"
+      },
+      {
+        "command": "xrobot.editSourceMirror",
+        "title": "XRobot: Edit Source Mirror"
+      },
+      {
+        "command": "xrobot.deleteSource",
+        "title": "XRobot: Delete Source"
+      },
+      {
+        "command": "xrobot.addHardwareAlias",
+        "title": "XRobot: Add Hardware Alias"
+      },
+      {
+        "command": "xrobot.editHardwareAlias",
+        "title": "XRobot: Edit Hardware Alias"
+      },
+      {
+        "command": "xrobot.deleteHardwareAlias",
+        "title": "XRobot: Delete Hardware Alias"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "xrobot.pickLibxrConfigPath",
+          "when": "view == xrobot.libxrView && viewItem == xrobot.libxr.configPath",
+          "group": "inline",
+          "icon": "$(edit)"
+        },
+        {
+          "command": "xrobot.pickLibxrAppMainPath",
+          "when": "view == xrobot.libxrView && viewItem == xrobot.libxr.appMainPath",
+          "group": "inline",
+          "icon": "$(edit)"
+        },
+        {
+          "command": "xrobot.pickXrobotConfigPath",
+          "when": "view == xrobot.xrobotView && viewItem == xrobot.xrobot.configPath",
+          "group": "inline",
+          "icon": "$(edit)"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "XRobot",
+      "properties": {
+        "xrobot.cli.extraPath": {
+          "type": "string",
+          "default": "",
+          "description": "Additional path appended to PATH when running XRobot/LibXR CLI commands."
+        },
+        "xrobot.libxr.iocFile": {
+          "type": "string",
+          "default": "",
+          "description": "Preferred STM32 .ioc file relative to workspace root. Leave empty to auto-detect first root-level *.ioc."
+        },
+        "xrobot.libxr.configPath": {
+          "type": "string",
+          "default": "User/libxr_config.yaml",
+          "description": "Path to libxr_config.yaml relative to workspace root."
+        },
+        "xrobot.libxr.appMainPath": {
+          "type": "string",
+          "default": "User/app_main.cpp",
+          "description": "Path to app_main.cpp relative to workspace root."
+        },
+        "xrobot.xrobot.configPath": {
+          "type": "string",
+          "default": "User/xrobot.yaml",
+          "description": "Current XRobot config file (searched under User/**/*.yml|yaml, excluding names containing libxr)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.54.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
