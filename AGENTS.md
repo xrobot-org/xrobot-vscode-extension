@@ -40,12 +40,14 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
   - Editing XRobot config/instances triggers `xrobot_gen_main --config <current xrobot config>`.
 - Add repo should prefer candidates discovered from current sources via `xrobot_src_man list`.
 - Startup diagnostics must check `git`, `python`, `pip`, and pip packages `xrobot`/`libxr`, and report missing dependencies in the `XRobot` output channel.
+- CLI command labels and invocations must avoid `.exe` suffixes to keep Linux/macOS compatibility.
 - LibXR view gating:
   - unsupported platform => show unsupported only
-  - STM32 but missing libxr yaml => show platform + `xr_cubemx_cfg.exe -d .` action only
+  - STM32 but missing libxr yaml => show platform + `xr_cubemx_cfg -d .` action only
   - STM32 + libxr yaml present => show full LibXR panels/actions
 - XRobot view gating:
   - missing current xrobot yaml => show only `xrobot_setup` action
+- Hardware container aliases must be expandable; edit/delete actions live under the expanded alias.
 - UX ordering rule: in each peer list/group, place `add ...` operations before existing items for faster access in long lists.
 
 ## High-Risk Areas

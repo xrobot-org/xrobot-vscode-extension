@@ -3,7 +3,7 @@
   "publisher": "XRobot",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "icon": "media/xrobot.png",
   "repository": {
     "type": "git",

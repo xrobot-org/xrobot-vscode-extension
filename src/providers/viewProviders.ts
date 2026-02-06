@@ -164,9 +164,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 				groupNode(
 					'Actions',
 					[
-						actionNode('Configure CubeMX (xr_cubemx_cfg.exe)', {
-							label: 'xr_cubemx_cfg.exe',
-							cmd: 'xr_cubemx_cfg.exe',
+						actionNode('Configure CubeMX (xr_cubemx_cfg)', {
+							label: 'xr_cubemx_cfg',
+							cmd: 'xr_cubemx_cfg',
 							args: ['-d', '.'],
 						}),
 					],
@@ -288,10 +288,15 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			}
 			const aliasList = Array.isArray(aliasObj?.aliases) ? aliasObj.aliases.map((a) => String(a)) : [];
 			aliasList.forEach((alias, idx) => {
-				children.push(opNode(`alias: ${alias}`, 'xrobot.editHardwareAlias', [name, idx], undefined, 'edit'));
+				const aliasChildren: TreeNode[] = [
+					opNode('edit alias', 'xrobot.editHardwareAlias', [name, idx], undefined, 'edit'),
+				];
 				if (aliasList.length > 1) {
-					children.push(opNode(`delete alias: ${alias}`, 'xrobot.deleteHardwareAlias', [name, idx], undefined, 'trash'));
+					aliasChildren.push(
+						opNode('delete alias', 'xrobot.deleteHardwareAlias', [name, idx], undefined, 'trash'),
+					);
 				}
+				children.push(groupNode(`alias: ${alias}`, aliasChildren, false));
 			});
 			nodes.push(groupNode(name, children.length > 0 ? children : [messageNode('(empty)')], false));
 		}
@@ -320,9 +325,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		if (ctx.platform === 'stm32') {
 			nodes.push(
-				actionNode('Configure CubeMX (xr_cubemx_cfg.exe)', {
-					label: 'xr_cubemx_cfg.exe',
-					cmd: 'xr_cubemx_cfg.exe',
+				actionNode('Configure CubeMX (xr_cubemx_cfg)', {
+					label: 'xr_cubemx_cfg',
+					cmd: 'xr_cubemx_cfg',
 					args: withXrobot ? ['-d', '.', '--xrobot'] : ['-d', '.'],
 				}),
 			);
@@ -2142,12 +2147,7 @@ export function checkCliPrerequisites(): void {
 	const pythonCmd = detectPythonCommand();
 	const pythonAvailable = pythonCmd ? isPythonAvailable(pythonCmd) : false;
 	const hasXrobotCli = isAnyCommandAvailable(['xrobot_setup', 'xrobot_init_mod']);
-	const hasLibxrCli = isAnyCommandAvailable([
-		'xr_parse_ioc',
-		'xr_gen_code_stm32',
-		'xr_cubemx_cfg.exe',
-		'xr_cubemx_cfg',
-	]);
+	const hasLibxrCli = isAnyCommandAvailable(['xr_parse_ioc', 'xr_gen_code_stm32', 'xr_cubemx_cfg']);
 
 	if (!isCommandAvailable('git')) {
 		errors.push('Missing tool: git');
@@ -2168,7 +2168,7 @@ export function checkCliPrerequisites(): void {
 		errors.push('Missing executable in PATH: xrobot CLI (e.g. xrobot_setup)');
 	}
 	if (!hasLibxrCli) {
-		errors.push('Missing executable in PATH: libxr CLI (e.g. xr_parse_ioc / xr_cubemx_cfg.exe)');
+		errors.push('Missing executable in PATH: libxr CLI (e.g. xr_parse_ioc / xr_cubemx_cfg)');
 	}
 
 	if (errors.length === 0) {
