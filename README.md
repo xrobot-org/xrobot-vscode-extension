@@ -13,16 +13,18 @@ VS Code extension for XRobot + LibXR workspace management.
 ## Requirements
 
 - `git`
-- `python` (or `py`) + `pip`
+- `python` (or `py`) + `pip` (configurable via `xrobot.cli.pythonPath`)
 - pip packages:
   - `xrobot`
   - `libxr`
+  - Alternatively: install CLIs via `pipx` and ensure they are on PATH.
 
 The extension checks dependencies at startup and reports missing items in the `XRobot` output channel.
 
 ## Settings
 
 - `xrobot.cli.extraPath`
+- `xrobot.cli.pythonPath`
 - `xrobot.libxr.iocFile`
 - `xrobot.libxr.configPath`
 - `xrobot.libxr.appMainPath`

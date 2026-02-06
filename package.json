@@ -3,7 +3,7 @@
   "publisher": "XRobot",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "icon": "media/xrobot.png",
   "repository": {
     "type": "git",
@@ -194,6 +194,11 @@
           "default": "",
           "description": "Additional path appended to PATH when running XRobot/LibXR CLI commands."
         },
+        "xrobot.cli.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Python executable name or full path used for pip checks (e.g. python3.11). Leave empty to auto-detect."
+        },
         "xrobot.libxr.iocFile": {
           "type": "string",
           "default": "",
@@ -232,10 +237,14 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.108.0",
+    "@vscode/vsce": "2.24.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0"
+  },
+  "overrides": {
+    "cheerio": "1.0.0-rc.12"
   }
 }

@@ -2140,26 +2140,34 @@ export function checkCliPrerequisites(): void {
 	// Release-time startup diagnostics: report missing runtime dependencies early.
 	const errors: string[] = [];
 	const pythonCmd = detectPythonCommand();
+	const pythonAvailable = pythonCmd ? isPythonAvailable(pythonCmd) : false;
+	const hasXrobotCli = isAnyCommandAvailable(['xrobot_setup', 'xrobot_init_mod']);
+	const hasLibxrCli = isAnyCommandAvailable([
+		'xr_parse_ioc',
+		'xr_gen_code_stm32',
+		'xr_cubemx_cfg.exe',
+		'xr_cubemx_cfg',
+	]);
 
 	if (!isCommandAvailable('git')) {
 		errors.push('Missing tool: git');
 	}
-	if (!pythonCmd) {
-		errors.push('Missing tool: python (or py)');
+	if (!pythonCmd || !pythonAvailable) {
+		errors.push('Missing tool: python (python/py/python3.x)');
 	}
-	if (!isPipAvailable(pythonCmd)) {
+	if (!isPipAvailable(pythonAvailable ? pythonCmd : undefined)) {
 		errors.push('Missing tool: pip (python -m pip unavailable)');
 	}
-	if (pythonCmd && !hasPipPackage(pythonCmd, 'xrobot')) {
+	if (pythonCmd && pythonAvailable && !hasXrobotCli && !hasPipPackage(pythonCmd, 'xrobot')) {
 		errors.push('Missing pip package: xrobot');
 	}
-	if (pythonCmd && !hasPipPackage(pythonCmd, 'libxr')) {
+	if (pythonCmd && pythonAvailable && !hasLibxrCli && !hasPipPackage(pythonCmd, 'libxr')) {
 		errors.push('Missing pip package: libxr');
 	}
-	if (!isAnyCommandAvailable(['xrobot_setup', 'xrobot_init_mod'])) {
+	if (!hasXrobotCli) {
 		errors.push('Missing executable in PATH: xrobot CLI (e.g. xrobot_setup)');
 	}
-	if (!isAnyCommandAvailable(['xr_parse_ioc', 'xr_gen_code_stm32', 'xr_cubemx_cfg.exe', 'xr_cubemx_cfg'])) {
+	if (!hasLibxrCli) {
 		errors.push('Missing executable in PATH: libxr CLI (e.g. xr_parse_ioc / xr_cubemx_cfg.exe)');
 	}
 
@@ -2192,13 +2200,51 @@ export function isCommandAvailable(commandName: string): boolean {
 	return result.status === 0 && Boolean((result.stdout ?? '').trim());
 }
 
+function isExecutablePath(commandName: string): boolean {
+	if (!commandName) {
+		return false;
+	}
+	const hasPathSep = commandName.includes('/') || commandName.includes('\\');
+	if (!hasPathSep) {
+		return false;
+	}
+	try {
+		return fs.existsSync(commandName);
+	} catch {
+		return false;
+	}
+}
+
+function isPythonAvailable(commandName: string): boolean {
+	if (isExecutablePath(commandName)) {
+		return true;
+	}
+	return isCommandAvailable(commandName);
+}
+
 function detectPythonCommand(): string | undefined {
-	if (isCommandAvailable('python')) {
-		return 'python';
+	const configured = vscode.workspace.getConfiguration('xrobot.cli').get<string>('pythonPath', '').trim();
+	if (configured) {
+		return configured;
+	 }
+
+	const candidates = [
+		'python',
+		'python3',
+		'python3.12',
+		'python3.11',
+		'python3.10',
+		'python3.9',
+		'python3.8',
+		'py',
+	];
+
+	for (const candidate of candidates) {
+		if (isPythonAvailable(candidate)) {
+			return candidate;
+		}
 	}
-	if (isCommandAvailable('py')) {
-		return 'py';
-	}
+
 	return undefined;
 }
 
@@ -2434,4 +2480,3 @@ export function registerWatchers(context: vscode.ExtensionContext, refreshAll: (
 		}),
 	);
 }
-

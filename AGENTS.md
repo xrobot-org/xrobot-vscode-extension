@@ -1,6 +1,6 @@
 # XRobot VS Code Extension Agent Notes
 
-Last Updated: 2026-02-05
+Last Updated: 2026-02-06
 
 ## Goal
 Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
@@ -20,6 +20,8 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
 - Keep `xrobot.helloWorld` command intact.
 - Keep `engines.vscode` compatible with VS Code 1.108.x.
 - Dev host launch should include `--disable-extensions`.
+- Allow configuring Python executable via `xrobot.cli.pythonPath` (name or full path).
+- Dependency checks should accept pipx-installed CLIs (CLI in PATH is sufficient even if `pip show` fails).
 - Prefer semantic text over ambiguous placeholders.
   - Mirror missing => `not a mirror source`
   - Repo version missing => `default branch latest`
