@@ -38,6 +38,7 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
 - Auto-regenerate behavior:
   - Editing LibXR config or hardware aliases triggers `xr_gen_code_stm32` with current configured paths.
   - Editing XRobot config/instances triggers `xrobot_gen_main --config <current xrobot config>`.
+  - Switching current LibXR/XRobot config triggers its corresponding code generation.
 - Add repo should prefer candidates discovered from current sources via `xrobot_src_man list`.
 - Startup diagnostics must check `git`, `python`, `pip`, and pip packages `xrobot`/`libxr`, and report missing dependencies in the `XRobot` output channel.
 - CLI command labels and invocations must avoid `.exe` suffixes to keep Linux/macOS compatibility.

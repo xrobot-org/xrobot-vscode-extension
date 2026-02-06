@@ -2414,7 +2414,11 @@ export async function pickXrobotConfigPath(): Promise<void> {
 	if (!picked) {
 		return;
 	}
+	if (picked.label === current) {
+		return;
+	}
 	await vscode.workspace.getConfiguration().update('xrobot.xrobot.configPath', picked.label, vscode.ConfigurationTarget.Workspace);
+	await runXrobotGenerateMainFromCurrent();
 }
 
 export async function pickLibxrConfigPath(): Promise<void> {
@@ -2437,7 +2441,11 @@ export async function pickLibxrConfigPath(): Promise<void> {
 	if (!picked) {
 		return;
 	}
+	if (picked.label === current) {
+		return;
+	}
 	await vscode.workspace.getConfiguration().update('xrobot.libxr.configPath', picked.label, vscode.ConfigurationTarget.Workspace);
+	await runLibxrGenerateCodeFromCurrent();
 }
 
 export function registerWatchers(context: vscode.ExtensionContext, refreshAll: () => void): void {
