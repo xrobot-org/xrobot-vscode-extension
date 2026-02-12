@@ -1,7 +1,5 @@
 # XRobot VS Code Extension Agent Notes
 
-Last Updated: 2026-02-06
-
 ## Goal
 Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
 - Activity Bar container `xrobot`
@@ -48,6 +46,7 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
   - STM32 + libxr yaml present => show full LibXR panels/actions
 - XRobot view gating:
   - missing current xrobot yaml => show only `xrobot_setup` action
+  - current xrobot yaml exists but is not xrobot-shaped (must contain `modules` array or `global_settings` object) => treat as missing
 - Hardware container aliases must be expandable; edit/delete actions live under the expanded alias.
 - UX ordering rule: in each peer list/group, place `add ...` operations before existing items for faster access in long lists.
 
@@ -59,10 +58,4 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
 - Protected source URL should not be editable/deletable:
   - `https://xrobot-org.github.io/xrobot-modules/index.yaml`
 - Alias editing in hardware container must keep at least one alias.
-
-## Change Protocol (Keep This Updated)
-When changing behavior or file structure, update this file in the same commit:
-1. Update `Last Updated`.
-2. Update `Current Architecture` if files/responsibilities changed.
-3. Update `Key Product Rules` if UX semantics/constraints changed.
-4. Add any new high-risk behavior to `High-Risk Areas`.
+- Alias editing in hardware container uses validated write-back (post-write parse check + rollback on failure).

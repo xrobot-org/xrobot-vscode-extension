@@ -4,6 +4,9 @@ import * as path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { stringify as stringifyYaml } from 'yaml';
 import { asRecord, parseYamlSafe } from '../yaml/yamlStore';
+import { hasUsableXrobotConfig } from './xrobotConfigUtils';
+import { guardedWriteYamlRoot } from './yamlWriteGuard';
+import { discoverUserLibxrConfigs, discoverUserXrobotConfigs } from './workspaceConfigDiscovery';
 import {
 	MIRROR_NONE_LABEL,
 	PRIORITY_UNSET_LABEL,
@@ -104,6 +107,8 @@ type WorkspaceContext = {
 
 export const outputChannel = vscode.window.createOutputChannel('XRobot');
 export const PROTECTED_SOURCE_URL = 'https://xrobot-org.github.io/xrobot-modules/index.yaml';
+export { isLikelyXrobotConfig } from './xrobotConfigUtils';
+export { discoverUserLibxrConfigs, discoverUserXrobotConfigs } from './workspaceConfigDiscovery';
 
 // Provider: LibXR view tree
 export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -1123,7 +1128,7 @@ function getWorkspaceContext(): WorkspaceContext | undefined {
 		xrobotConfigRel: xrobotConfig.selectedRel,
 		xrobotConfigAbs: path.join(root, xrobotConfig.selectedRel),
 		xrobotConfigCandidates: xrobotConfig.candidates,
-		hasXrobotConfig: fs.existsSync(path.join(root, xrobotConfig.selectedRel)),
+		hasXrobotConfig: hasUsableXrobotConfig(path.join(root, xrobotConfig.selectedRel)),
 	};
 }
 
@@ -1182,53 +1187,6 @@ function resolveLibxrConfig(root: string): { selectedRel: string; candidates: st
 		return { selectedRel: candidates[0], candidates };
 	}
 	return { selectedRel: configured, candidates: [] };
-}
-
-export function discoverUserXrobotConfigs(root: string): string[] {
-	return discoverUserYamlConfigsByKind(root, 'xrobot');
-}
-
-export function discoverUserLibxrConfigs(root: string): string[] {
-	return discoverUserYamlConfigsByKind(root, 'libxr');
-}
-
-function discoverUserYamlConfigsByKind(root: string, kind: 'xrobot' | 'libxr'): string[] {
-	const userDir = path.join(root, 'User');
-	if (!fs.existsSync(userDir)) {
-		return [];
-	}
-	const result: string[] = [];
-	const stack: string[] = [userDir];
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (!current) {
-			continue;
-		}
-		for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-			const abs = path.join(current, entry.name);
-			if (entry.isDirectory()) {
-				stack.push(abs);
-				continue;
-			}
-			if (!entry.isFile()) {
-				continue;
-			}
-			const lower = entry.name.toLowerCase();
-			if (!(lower.endsWith('.yaml') || lower.endsWith('.yml'))) {
-				continue;
-			}
-			if (kind === 'xrobot') {
-				if (lower.includes('libxr')) {
-					continue;
-				}
-			} else if (!lower.includes('libxr')) {
-				continue;
-			}
-			result.push(toWorkspacePath(root, abs));
-		}
-	}
-	result.sort((a, b) => a.localeCompare(b));
-	return result;
 }
 
 type SourceItem =
@@ -1612,70 +1570,92 @@ export async function deleteSource(index: number): Promise<void> {
 	writeYamlRoot(sourcesYamlPath(), root);
 }
 
-export async function addHardwareAlias(entryKey: string): Promise<void> {
+type HardwareAliasEditState = {
+	root: Record<string, unknown>;
+	entry: Record<string, unknown>;
+	aliases: string[];
+};
+
+function getHardwareAliasEditState(entryKey: string): HardwareAliasEditState | undefined {
 	const root = ensureLibxrRootWithDeviceAliases();
 	if (!root) {
-		return;
+		return undefined;
 	}
 	const entry = asRecord((root.device_aliases as Record<string, unknown>)[entryKey]);
 	if (!entry) {
-		return;
+		return undefined;
 	}
 	const aliases = Array.isArray(entry.aliases) ? entry.aliases.map((a) => String(a)) : [];
+	return { root, entry, aliases };
+}
+
+function hardwareAliasOperation(action: 'add' | 'edit' | 'delete', entryKey: string, aliasIndex?: number): string {
+	if (aliasIndex === undefined) {
+		return `${action}HardwareAlias(${entryKey})`;
+	}
+	return `${action}HardwareAlias(${entryKey},${aliasIndex})`;
+}
+
+async function persistHardwareAliasEdit(
+	state: HardwareAliasEditState,
+	entryKey: string,
+	action: 'add' | 'edit' | 'delete',
+	aliasIndex?: number,
+): Promise<boolean> {
+	state.entry.aliases = state.aliases;
+	const op = hardwareAliasOperation(action, entryKey, aliasIndex);
+	const detail = aliasIndex === undefined ? `entry=${entryKey} aliases=${state.aliases.length}` : `entry=${entryKey} index=${aliasIndex} aliases=${state.aliases.length}`;
+	outputChannel.appendLine(`[libxr] ${action}HardwareAlias ${detail}`);
+	if (!writeLibxrConfigWithValidation(state.root, op)) {
+		return false;
+	}
+	await runLibxrGenerateCodeFromCurrent();
+	return true;
+}
+
+export async function addHardwareAlias(entryKey: string): Promise<void> {
+	const state = getHardwareAliasEditState(entryKey);
+	if (!state) {
+		return;
+	}
 	const next = await vscode.window.showInputBox({ prompt: `Add alias to ${entryKey}` });
 	if (!next || !next.trim()) {
 		return;
 	}
-	aliases.push(next.trim());
-	entry.aliases = aliases;
-	writeYamlRoot(libxrConfigPath(), root);
-	await runLibxrGenerateCodeFromCurrent();
+	state.aliases.push(next.trim());
+	await persistHardwareAliasEdit(state, entryKey, 'add');
 }
 
 export async function editHardwareAlias(entryKey: string, aliasIndex: number): Promise<void> {
-	const root = ensureLibxrRootWithDeviceAliases();
-	if (!root) {
+	const state = getHardwareAliasEditState(entryKey);
+	if (!state) {
 		return;
 	}
-	const entry = asRecord((root.device_aliases as Record<string, unknown>)[entryKey]);
-	if (!entry) {
+	if (aliasIndex < 0 || aliasIndex >= state.aliases.length) {
 		return;
 	}
-	const aliases = Array.isArray(entry.aliases) ? entry.aliases.map((a) => String(a)) : [];
-	if (aliasIndex < 0 || aliasIndex >= aliases.length) {
-		return;
-	}
-	const next = await vscode.window.showInputBox({ prompt: `Edit alias of ${entryKey}`, value: aliases[aliasIndex] });
+	const next = await vscode.window.showInputBox({ prompt: `Edit alias of ${entryKey}`, value: state.aliases[aliasIndex] });
 	if (!next || !next.trim()) {
 		return;
 	}
-	aliases[aliasIndex] = next.trim();
-	entry.aliases = aliases;
-	writeYamlRoot(libxrConfigPath(), root);
-	await runLibxrGenerateCodeFromCurrent();
+	state.aliases[aliasIndex] = next.trim();
+	await persistHardwareAliasEdit(state, entryKey, 'edit', aliasIndex);
 }
 
 export async function deleteHardwareAlias(entryKey: string, aliasIndex: number): Promise<void> {
-	const root = ensureLibxrRootWithDeviceAliases();
-	if (!root) {
+	const state = getHardwareAliasEditState(entryKey);
+	if (!state) {
 		return;
 	}
-	const entry = asRecord((root.device_aliases as Record<string, unknown>)[entryKey]);
-	if (!entry) {
-		return;
-	}
-	const aliases = Array.isArray(entry.aliases) ? entry.aliases.map((a) => String(a)) : [];
-	if (aliases.length <= 1) {
+	if (state.aliases.length <= 1) {
 		vscode.window.showInformationMessage('At least one alias must remain.');
 		return;
 	}
-	if (aliasIndex < 0 || aliasIndex >= aliases.length) {
+	if (aliasIndex < 0 || aliasIndex >= state.aliases.length) {
 		return;
 	}
-	aliases.splice(aliasIndex, 1);
-	entry.aliases = aliases;
-	writeYamlRoot(libxrConfigPath(), root);
-	await runLibxrGenerateCodeFromCurrent();
+	state.aliases.splice(aliasIndex, 1);
+	await persistHardwareAliasEdit(state, entryKey, 'delete', aliasIndex);
 }
 
 export async function addModuleInstance(): Promise<void> {
@@ -1951,7 +1931,7 @@ async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 		: path.dirname(libxrConfigRel).replace(/\\/g, '/')}/.config.yaml`;
 	const parseIocOut = `./${parseIocOutRaw.replace(/^\.?\//, '')}`;
 	const libxrConfigArg = `./${libxrConfigRel.replace(/^\.?\//, '')}`;
-	const withXrobot = fs.existsSync(xrobotConfigPath());
+	const withXrobot = hasUsableXrobotConfig(xrobotConfigPath());
 	const args = ['-i', parseIocOut, '-o', appMainArg, '--libxr-config', libxrConfigArg];
 	if (withXrobot) {
 		args.splice(4, 0, '--xrobot');
@@ -2058,6 +2038,30 @@ function ensureLibxrRootWithDeviceAliases(): Record<string, unknown> | undefined
 	}
 	root.device_aliases = aliases;
 	return root;
+}
+
+function writeLibxrConfigWithValidation(root: Record<string, unknown>, operation: string): boolean {
+	const filePath = libxrConfigPath();
+	const result = guardedWriteYamlRoot(filePath, root, (parsedRoot) => Boolean(asRecord(parsedRoot.device_aliases)));
+	if (result.ok) {
+		return true;
+	}
+	if (result.stage === 'read') {
+		vscode.window.showErrorMessage(`Cannot read libxr config before ${operation}: ${filePath}`);
+		outputChannel.appendLine(`[libxr] ${operation}: read failed: ${result.error}`);
+		return false;
+	}
+	if (result.stage === 'write') {
+		vscode.window.showErrorMessage(`Failed to write libxr config during ${operation}.`);
+		outputChannel.appendLine(`[libxr] ${operation}: write failed: ${result.error}`);
+		return false;
+	}
+	vscode.window.showErrorMessage('LibXR config validation failed after alias edit; restored previous file.');
+	outputChannel.appendLine(`[libxr] ${operation}: post-write validation failed: ${result.error}`);
+	if (result.rollbackError) {
+		outputChannel.appendLine(`[libxr] ${operation}: rollback failed: ${result.rollbackError}`);
+	}
+	return false;
 }
 
 export function getSourceObject(items: unknown[], index: number): Record<string, unknown> | undefined {
