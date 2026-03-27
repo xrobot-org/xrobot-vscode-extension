@@ -4,6 +4,8 @@ src/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
+xrobot/**
+_artifacts/**
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map

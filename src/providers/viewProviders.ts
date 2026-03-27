@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { stringify as stringifyYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { asRecord, parseYamlSafe } from '../yaml/yamlStore';
 import { hasUsableXrobotConfig } from './xrobotConfigUtils';
 import { guardedWriteYamlRoot } from './yamlWriteGuard';
@@ -103,6 +103,17 @@ type WorkspaceContext = {
 	xrobotConfigAbs: string;
 	xrobotConfigCandidates: string[];
 	hasXrobotConfig: boolean;
+};
+
+type GitRemoteRef = {
+	name: string;
+	kind: 'branch' | 'tag';
+	sortTime?: number;
+	timeText?: string;
+};
+
+type RefQuickPickItem = vscode.QuickPickItem & {
+	refName?: string;
 };
 
 export const outputChannel = vscode.window.createOutputChannel('XRobot');
@@ -517,20 +528,33 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		modules.forEach((item, index) => {
 			const spec = moduleRepoString(item);
 			const parsedSpec = parseRepoSpec(spec);
+			const repoChildren: TreeNode[] = [
+				opNode(`repo: ${parsedSpec.repo}`, 'xrobot.editRepoName', [index], undefined, 'edit'),
+				opNode(
+					`version: ${parsedSpec.version ?? REMOTE_VERSION_DEFAULT_LABEL}`,
+					'xrobot.editRepoVersion',
+					[index],
+					undefined,
+					'versions',
+				),
+				opNode('delete', 'xrobot.deleteRepo', [index], undefined, 'trash'),
+			];
+			const headerPath = findLocalModuleHeader(ctx.root, parsedSpec.repo);
+			if (headerPath) {
+				repoChildren.push(fileNode('module header', headerPath, toWorkspacePath(ctx.root, headerPath), 'none'));
+				const manifestRoot = readModuleManifestRoot(headerPath);
+				if (manifestRoot) {
+					repoChildren.push(groupNode('module_manifest', buildModuleManifestNodes(manifestRoot, headerPath), true));
+				} else {
+					repoChildren.push(messageNode('module manifest parse failed'));
+				}
+			} else {
+				repoChildren.push(messageNode('module source not found locally; run xrobot_init_mod first'));
+			}
 			nodes.push(
 				groupNode(
 					parsedSpec.repo,
-					[
-						opNode(`repo: ${parsedSpec.repo}`, 'xrobot.editRepoName', [index], undefined, 'edit'),
-						opNode(
-							`version: ${parsedSpec.version ?? REMOTE_VERSION_DEFAULT_LABEL}`,
-							'xrobot.editRepoVersion',
-							[index],
-							undefined,
-							'versions',
-						),
-						opNode('delete', 'xrobot.deleteRepo', [index], undefined, 'trash'),
-					],
+					repoChildren,
 					false,
 				),
 			);
@@ -1325,10 +1349,218 @@ function readIndexMeta(indexPath: string): { namespace?: string; mirrorOf?: stri
 	};
 }
 
+function findLocalModuleHeader(root: string, repoSpec: string): string | undefined {
+	const parts = repoSpec.split('/');
+	const moduleName = parts[parts.length - 1];
+	if (!moduleName) {
+		return undefined;
+	}
+	const moduleDir = path.join(root, 'Modules', moduleName);
+	const headerCandidates = [
+		path.join(moduleDir, `${moduleName}.hpp`),
+		path.join(moduleDir, `${moduleName}.h`),
+	];
+	return headerCandidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function normalizeManifestKeyValueList(value: unknown): Array<Record<string, unknown>> {
+	if (Array.isArray(value)) {
+		return value.map((item) => ({ ...(asRecord(item) ?? {}) }));
+	}
+	const obj = asRecord(value);
+	if (obj) {
+		return Object.entries(obj).map(([k, v]) => ({ [k]: v }));
+	}
+	if (typeof value === 'string' && value.trim()) {
+		return [{ [value.trim()]: '' }];
+	}
+	return [];
+}
+
+function normalizeManifestStringList(value: unknown): string[] {
+	if (Array.isArray(value)) {
+		return value.map((item) => String(item));
+	}
+	if (typeof value === 'string' && value.trim()) {
+		return [value.trim()];
+	}
+	return [];
+}
+
+function readModuleManifestRoot(filePath: string): Record<string, unknown> | undefined {
+	if (!fs.existsSync(filePath)) {
+		return undefined;
+	}
+	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+	const match = content.match(/\/\*\s*=== MODULE MANIFEST(?: V2)? ===\s*([\s\S]*?)\s*=== END MANIFEST ===\s*\*\//i);
+	if (!match) {
+		return undefined;
+	}
+	try {
+		const parsed = parseYaml(match[1]);
+		const root = asRecord(parsed);
+		if (!root) {
+			return undefined;
+		}
+		root.constructor_args = normalizeManifestKeyValueList(root.constructor_args);
+		root.template_args = normalizeManifestKeyValueList(root.template_args);
+		root.required_hardware = normalizeManifestStringList(root.required_hardware);
+		root.depends = normalizeManifestStringList(root.depends);
+		return root;
+	} catch {
+		return undefined;
+	}
+}
+
+function writeModuleManifestRoot(filePath: string, root: Record<string, unknown>): boolean {
+	if (!fs.existsSync(filePath)) {
+		return false;
+	}
+	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+	const pattern = /(\/\*\s*=== MODULE MANIFEST(?: V2)? ===\s*)([\s\S]*?)(\s*=== END MANIFEST ===\s*\*\/)/i;
+	const eol = content.includes('\r\n') ? '\r\n' : '\n';
+	if (!pattern.test(content)) {
+		return false;
+	}
+	const manifestBody = stringifyYaml(root).trimEnd().replace(/\n/g, eol);
+	const updated = content.replace(pattern, `$1${manifestBody}${eol}$3`);
+	fs.writeFileSync(filePath, updated, 'utf8');
+	return true;
+}
+
+function readEditableRoot(filePath: string): Record<string, unknown> | undefined {
+	if (/\.(hpp|h)$/i.test(filePath)) {
+		return readModuleManifestRoot(filePath);
+	}
+	return readYamlRoot(filePath);
+}
+
+function writeEditableRoot(filePath: string, root: Record<string, unknown>): boolean {
+	if (/\.(hpp|h)$/i.test(filePath)) {
+		return writeModuleManifestRoot(filePath, root);
+	}
+	writeYamlRoot(filePath, root);
+	return true;
+}
+
+function buildModuleManifestNodes(manifestRoot: Record<string, unknown>, filePath: string): TreeNode[] {
+	const nodes: TreeNode[] = [];
+	if (Object.prototype.hasOwnProperty.call(manifestRoot, 'module_description')) {
+		nodes.push(yamlNode('module_description', manifestRoot.module_description, 0, filePath, ['module_description'], true));
+	} else {
+		nodes.push(messageNode('(missing) module_description'));
+	}
+	nodes.push(
+		groupNode(
+			'constructor_args',
+			buildManifestKeyValueSectionNodes(filePath, 'constructor_args', manifestRoot.constructor_args, 'constructor arg'),
+			true,
+		),
+	);
+	nodes.push(
+		groupNode(
+			'template_args',
+			buildManifestKeyValueSectionNodes(filePath, 'template_args', manifestRoot.template_args, 'template arg'),
+			true,
+		),
+	);
+	nodes.push(
+		groupNode(
+			'required_hardware',
+			buildManifestStringSectionNodes(filePath, 'required_hardware', manifestRoot.required_hardware, 'hardware'),
+			true,
+		),
+	);
+	nodes.push(
+		groupNode(
+			'depends',
+			buildManifestStringSectionNodes(filePath, 'depends', manifestRoot.depends, 'dependency'),
+			true,
+		),
+	);
+	for (const [key, value] of Object.entries(manifestRoot)) {
+		if (['module_description', 'constructor_args', 'template_args', 'required_hardware', 'depends'].includes(key)) {
+			continue;
+		}
+		nodes.push(yamlNode(key, value, 0, filePath, [key], true));
+	}
+	return nodes;
+}
+
+function buildManifestKeyValueSectionNodes(
+	filePath: string,
+	section: string,
+	value: unknown,
+	itemLabel: string,
+): TreeNode[] {
+	const items = normalizeManifestKeyValueList(value);
+	const nodes: TreeNode[] = [opNode(`add ${itemLabel}`, 'xrobot.addModuleManifestKeyValue', [filePath, section], undefined, 'add')];
+	if (items.length === 0) {
+		nodes.push(messageNode('(empty)'));
+		return nodes;
+	}
+	items.forEach((entry, index) => {
+		const obj = asRecord(entry);
+		if (obj && Object.keys(obj).length === 1) {
+			const [key, itemValue] = Object.entries(obj)[0];
+			nodes.push(
+				groupNode(
+					key,
+					[
+						yamlNode('value', itemValue, 0, filePath, [section, index, key], true),
+						opNode('rename key', 'xrobot.renameModuleManifestKey', [filePath, section, index], undefined, 'edit'),
+						opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
+					],
+					false,
+				),
+			);
+			return;
+		}
+		nodes.push(
+			groupNode(
+				`${itemLabel} #${index}`,
+				[
+					...toYamlValueNodes(entry, 0, filePath, [section, index], true),
+					opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
+				],
+				false,
+			),
+		);
+	});
+	return nodes;
+}
+
+function buildManifestStringSectionNodes(
+	filePath: string,
+	section: string,
+	value: unknown,
+	itemLabel: string,
+): TreeNode[] {
+	const items = normalizeManifestStringList(value);
+	const nodes: TreeNode[] = [opNode(`add ${itemLabel}`, 'xrobot.addModuleManifestString', [filePath, section], undefined, 'add')];
+	if (items.length === 0) {
+		nodes.push(messageNode('(empty)'));
+		return nodes;
+	}
+	items.forEach((item, index) => {
+		nodes.push(
+			groupNode(
+				item,
+				[
+					yamlNode('value', item, 0, filePath, [section, index], true),
+					opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
+				],
+				false,
+			),
+		);
+	});
+	return nodes;
+}
+
 export async function editYamlScalar(filePath: string, keyPath: Array<string | number>): Promise<void> {
-	const rootObj = readYamlRoot(filePath);
+	const rootObj = readEditableRoot(filePath);
 	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load YAML: ${filePath}`);
+		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
 		return;
 	}
 	const current = getAtPath(rootObj, keyPath);
@@ -1344,12 +1576,120 @@ export async function editYamlScalar(filePath: string, keyPath: Array<string | n
 		return;
 	}
 	setAtPath(rootObj, keyPath, parseScalarInput(input));
-	writeYamlRoot(filePath, rootObj);
+	if (!writeEditableRoot(filePath, rootObj)) {
+		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
+		return;
+	}
 	if (normalizePath(filePath) === normalizePath(libxrConfigPath())) {
 		await runLibxrGenerateCodeFromCurrent();
 	}
 	if (normalizePath(filePath) === normalizePath(xrobotConfigPath())) {
 		await runXrobotGenerateMainFromCurrent();
+	}
+}
+
+export async function addModuleManifestKeyValue(filePath: string, section: string): Promise<void> {
+	const rootObj = readEditableRoot(filePath);
+	if (!rootObj) {
+		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
+		return;
+	}
+	const key = await vscode.window.showInputBox({
+		prompt: `New key for ${section}`,
+		placeHolder: section === 'constructor_args' ? 'blink_cycle' : 'ChassisType',
+	});
+	if (!key || !key.trim()) {
+		return;
+	}
+	const valueInput = await vscode.window.showInputBox({
+		prompt: `Default value for ${key.trim()}`,
+		value: '',
+	});
+	if (valueInput === undefined) {
+		return;
+	}
+	const items = normalizeManifestKeyValueList(rootObj[section]);
+	items.push({ [key.trim()]: parseScalarInput(valueInput) });
+	rootObj[section] = items;
+	if (!writeEditableRoot(filePath, rootObj)) {
+		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
+	}
+}
+
+export async function addModuleManifestString(filePath: string, section: string): Promise<void> {
+	const rootObj = readEditableRoot(filePath);
+	if (!rootObj) {
+		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
+		return;
+	}
+	const nextValue = await vscode.window.showInputBox({
+		prompt: `New value for ${section}`,
+		value: '',
+	});
+	if (!nextValue || !nextValue.trim()) {
+		return;
+	}
+	const items = normalizeManifestStringList(rootObj[section]);
+	items.push(nextValue.trim());
+	rootObj[section] = items;
+	if (!writeEditableRoot(filePath, rootObj)) {
+		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
+	}
+}
+
+export async function deleteModuleManifestEntry(filePath: string, section: string, index: number): Promise<void> {
+	const rootObj = readEditableRoot(filePath);
+	if (!rootObj) {
+		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
+		return;
+	}
+	if (section === 'constructor_args' || section === 'template_args') {
+		const items = normalizeManifestKeyValueList(rootObj[section]);
+		if (index < 0 || index >= items.length) {
+			return;
+		}
+		items.splice(index, 1);
+		rootObj[section] = items;
+	} else {
+		const items = normalizeManifestStringList(rootObj[section]);
+		if (index < 0 || index >= items.length) {
+			return;
+		}
+		items.splice(index, 1);
+		rootObj[section] = items;
+	}
+	if (!writeEditableRoot(filePath, rootObj)) {
+		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
+	}
+}
+
+export async function renameModuleManifestKey(filePath: string, section: string, index: number): Promise<void> {
+	const rootObj = readEditableRoot(filePath);
+	if (!rootObj) {
+		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
+		return;
+	}
+	const items = normalizeManifestKeyValueList(rootObj[section]);
+	if (index < 0 || index >= items.length) {
+		return;
+	}
+	const obj = asRecord(items[index]);
+	if (!obj || Object.keys(obj).length !== 1) {
+		vscode.window.showInformationMessage('Only single-key manifest entries can be renamed.');
+		return;
+	}
+	const [currentKey, currentValue] = Object.entries(obj)[0];
+	const nextKey = await vscode.window.showInputBox({
+		prompt: `Rename key in ${section}`,
+		value: currentKey,
+	});
+	if (!nextKey || !nextKey.trim() || nextKey.trim() === currentKey) {
+		return;
+	}
+	items[index] = { [nextKey.trim()]: currentValue };
+	rootObj[section] = items;
+	if (!writeEditableRoot(filePath, rootObj)) {
+		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
 	}
 }
 
@@ -1408,7 +1748,7 @@ export async function editRepoVersion(index: number): Promise<void> {
 	}
 	const items = root.modules as unknown[];
 	const current = parseRepoSpec(moduleRepoString(items[index]));
-	const remote = resolveRepoRemote(current.repo);
+	const remote = await resolveRepoRemote(current.repo);
 	const refs = await fetchGitRemoteRefs(remote);
 	if (!refs) {
 		vscode.window.showErrorMessage(`Cannot load tags/branches from ${remote}. Check git and network access.`);
@@ -1418,9 +1758,13 @@ export async function editRepoVersion(index: number): Promise<void> {
 		vscode.window.showInformationMessage(`No tag/branch found for ${current.repo}.`);
 		return;
 	}
-	const picks: vscode.QuickPickItem[] = [
-		{ label: REMOTE_VERSION_QUICKPICK_CLEAR, description: 'Use default branch latest commit' },
-		...refs.map((name) => ({ label: name })),
+	const picks: RefQuickPickItem[] = [
+		{ label: REMOTE_VERSION_QUICKPICK_CLEAR, description: 'Use default branch latest commit', refName: undefined },
+		...refs.map((ref) => ({
+			label: ref.name,
+			description: ref.kind === 'tag' ? `[tag]${ref.timeText ? ` ${ref.timeText}` : ''}` : '[branch]',
+			refName: ref.name,
+		})),
 	];
 	const picked = await vscode.window.showQuickPick(picks, {
 		placeHolder: `Select version for ${current.repo}`,
@@ -1429,7 +1773,7 @@ export async function editRepoVersion(index: number): Promise<void> {
 		return;
 	}
 	// Fallback to direct YAML write because xrobot CLI currently has no "edit repo version" command.
-	items[index] = buildRepoSpec(current.repo, picked.label === REMOTE_VERSION_QUICKPICK_CLEAR ? undefined : picked.label);
+	items[index] = buildRepoSpec(current.repo, picked.refName);
 	writeYamlRoot(modulesPath, root);
 }
 
@@ -1825,7 +2169,7 @@ export function buildRepoSpec(repo: string, version?: string): string {
 	return version ? `${repo}@${version}` : repo;
 }
 
-export function resolveRepoRemote(repo: string): string {
+export async function resolveRepoRemote(repo: string): Promise<string> {
 	const trimmed = repo.trim();
 	if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
 		return trimmed;
@@ -1834,12 +2178,30 @@ export function resolveRepoRemote(repo: string): string {
 		return trimmed;
 	}
 	if (/^[^/\s]+\/[^/\s]+$/.test(trimmed)) {
+		const resolved = await resolveRepoRemoteFromSources(trimmed);
+		if (resolved) {
+			return resolved;
+		}
 		return `https://github.com/${trimmed}.git`;
 	}
 	return trimmed;
 }
 
-export async function fetchGitRemoteRefs(remote: string): Promise<string[] | undefined> {
+async function resolveRepoRemoteFromSources(modid: string): Promise<string | undefined> {
+	const res = await runCommandCapture('xrobot_src_man', ['get', modid]);
+	if (!res.ok) {
+		return undefined;
+	}
+	for (const line of res.stdout.split(/\r?\n/)) {
+		const trimmed = line.trim();
+		if (/^https?:\/\/\S+$/i.test(trimmed) || /^git@[^:]+:\S+$/i.test(trimmed)) {
+			return trimmed;
+		}
+	}
+	return undefined;
+}
+
+export async function fetchGitRemoteRefs(remote: string): Promise<GitRemoteRef[] | undefined> {
 	return new Promise((resolve) => {
 		const child = spawn('git', ['ls-remote', '--heads', '--tags', remote], {
 			shell: true,
@@ -1867,25 +2229,76 @@ export async function fetchGitRemoteRefs(remote: string): Promise<string[] | und
 	});
 }
 
-export function parseGitRefs(raw: string): string[] {
-	const values = new Set<string>();
+export function parseGitRefs(raw: string): GitRemoteRef[] {
+	const values = new Map<string, GitRemoteRef>();
 	for (const line of raw.split(/\r?\n/)) {
 		const ref = line.split('\t')[1];
 		if (!ref) {
 			continue;
 		}
 		if (ref.startsWith('refs/heads/')) {
-			values.add(ref.slice('refs/heads/'.length));
+			const name = ref.slice('refs/heads/'.length);
+			if (name) {
+				values.set(`branch:${name}`, {
+					name,
+					kind: 'branch',
+				});
+			}
 			continue;
 		}
 		if (ref.startsWith('refs/tags/')) {
 			const tag = ref.slice('refs/tags/'.length).replace(/\^\{\}$/, '');
 			if (tag) {
-				values.add(tag);
+				const parsedTime = parseRefTimestamp(tag);
+				values.set(`tag:${tag}`, {
+					name: tag,
+					kind: 'tag',
+					sortTime: parsedTime?.sortTime,
+					timeText: parsedTime?.text,
+				});
 			}
 		}
 	}
-	return Array.from(values).sort((a, b) => a.localeCompare(b));
+	return Array.from(values.values()).sort(compareGitRefs);
+}
+
+function compareGitRefs(a: GitRemoteRef, b: GitRemoteRef): number {
+	if (a.kind !== b.kind) {
+		return a.kind === 'branch' ? -1 : 1;
+	}
+	const aTime = a.sortTime;
+	const bTime = b.sortTime;
+	const aHasTime = typeof aTime === 'number';
+	const bHasTime = typeof bTime === 'number';
+	if (aHasTime && bHasTime && aTime !== bTime) {
+		return bTime - aTime;
+	}
+	if (aHasTime !== bHasTime) {
+		return aHasTime ? -1 : 1;
+	}
+	return a.name.localeCompare(b.name);
+}
+
+function parseRefTimestamp(name: string): { sortTime: number; text: string } | undefined {
+	const match = name.match(/(\d{8})[-_](\d{6})(?!.*\d)/);
+	if (!match) {
+		return undefined;
+	}
+	const date = match[1];
+	const time = match[2];
+	const year = Number(date.slice(0, 4));
+	const month = Number(date.slice(4, 6));
+	const day = Number(date.slice(6, 8));
+	const hour = Number(time.slice(0, 2));
+	const minute = Number(time.slice(2, 4));
+	const second = Number(time.slice(4, 6));
+	if ([year, month, day, hour, minute, second].some((value) => !Number.isFinite(value))) {
+		return undefined;
+	}
+	return {
+		sortTime: Date.UTC(year, month - 1, day, hour, minute, second),
+		text: `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)} ${time.slice(0, 2)}:${time.slice(2, 4)}:${time.slice(4, 6)}`,
+	};
 }
 
 export function modulesYamlPath(): string {

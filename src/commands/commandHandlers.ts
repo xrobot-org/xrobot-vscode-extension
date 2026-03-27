@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import {
 	addHardwareAlias,
+	addModuleManifestKeyValue,
+	addModuleManifestString,
 	addModuleInstance,
 	addRepoEntry,
 	addSourceEntry,
 	checkCliPrerequisites,
 	createModuleWizard,
 	deleteHardwareAlias,
+	deleteModuleManifestEntry,
 	deleteModuleInstance,
 	deleteRepo,
 	deleteSource,
@@ -24,6 +27,7 @@ import {
 	pickLibxrConfigPath,
 	pickWorkspaceFileForSetting,
 	pickXrobotConfigPath,
+	renameModuleManifestKey,
 	registerWatchers,
 	runCli,
 	type CliRunRequest,
@@ -78,6 +82,22 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	context.subscriptions.push(
 		vscode.commands.registerCommand('xrobot.editYamlScalar', async (filePath: string, keyPath: Array<string | number>) => {
 			await editYamlScalar(filePath, keyPath);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.addModuleManifestKeyValue', async (filePath: string, section: string) => {
+			await addModuleManifestKeyValue(filePath, section);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.addModuleManifestString', async (filePath: string, section: string) => {
+			await addModuleManifestString(filePath, section);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.renameModuleManifestKey', async (filePath: string, section: string, index: number) => {
+			await renameModuleManifestKey(filePath, section, index);
+			refreshAll();
+		}),
+		vscode.commands.registerCommand('xrobot.deleteModuleManifestEntry', async (filePath: string, section: string, index: number) => {
+			await deleteModuleManifestEntry(filePath, section, index);
 			refreshAll();
 		}),
 		vscode.commands.registerCommand('xrobot.createModuleWizard', async () => {
