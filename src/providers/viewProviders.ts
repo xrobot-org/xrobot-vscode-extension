@@ -331,9 +331,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private buildActions(ctx: WorkspaceContext): TreeNode[] {
 		const appMainArg = `./${ctx.appMainRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
 		const iocDir = ctx.selectedIoc ? path.dirname(ctx.selectedIoc).replace(/\\/g, '/') : '.';
-		const libxrDir = path.dirname(ctx.libxrConfigRel).replace(/\\/g, '/');
-		const parseIocOutRaw = `${libxrDir === '.' ? 'User' : libxrDir}/.config.yaml`;
-		const parseIocOut = `./${parseIocOutRaw.replace(/^\.?\//, '')}`;
+		const parseIocOut = stm32ParsedConfigArg();
 		const libxrConfigArg = `./${ctx.libxrConfigRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
 		const flashModel = this.readFlashModel(ctx) ?? 'STM32F103C8';
 		const nodes: TreeNode[] = [];
@@ -2323,6 +2321,10 @@ export function xrobotConfigPath(): string {
 	return path.join(root, rel);
 }
 
+function stm32ParsedConfigArg(): string {
+	return './.config.yaml';
+}
+
 function normalizePath(p: string): string {
 	return path.resolve(p).toLowerCase();
 }
@@ -2339,10 +2341,7 @@ async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp').replace(/\\/g, '/');
 	const libxrConfigRel = getWorkspaceRelativeConfig('xrobot.libxr.configPath', 'User/libxr_config.yaml').replace(/\\/g, '/');
 	const appMainArg = `./${appMainRel.replace(/^\.?\//, '')}`;
-	const parseIocOutRaw = `${path.dirname(libxrConfigRel).replace(/\\/g, '/') === '.'
-		? 'User'
-		: path.dirname(libxrConfigRel).replace(/\\/g, '/')}/.config.yaml`;
-	const parseIocOut = `./${parseIocOutRaw.replace(/^\.?\//, '')}`;
+	const parseIocOut = stm32ParsedConfigArg();
 	const libxrConfigArg = `./${libxrConfigRel.replace(/^\.?\//, '')}`;
 	const withXrobot = hasUsableXrobotConfig(xrobotConfigPath());
 	const args = ['-i', parseIocOut, '-o', appMainArg, '--libxr-config', libxrConfigArg];
