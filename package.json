@@ -3,7 +3,7 @@
   "publisher": "XRobot",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
-  "version": "0.0.9",
+  "version": "1.0.0",
   "icon": "media/xrobot.png",
   "repository": {
     "type": "git",
@@ -16,6 +16,9 @@
   },
   "categories": [
     "Other"
+  ],
+  "extensionKind": [
+    "workspace"
   ],
   "activationEvents": [
     "onCommand:xrobot.helloWorld",

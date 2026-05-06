@@ -23,6 +23,30 @@ export type CliRunRequest = {
 	defaultInput?: string;
 };
 
+type CliInvocation = {
+	cmd: string;
+	argsPrefix: string[];
+	displayCmd: string;
+};
+
+const PYTHON_MODULE_CLI: Record<string, { packageName: string; moduleName: string }> = {
+	xrobot_add_mod: { packageName: 'xrobot', moduleName: 'xrobot.AddModule' },
+	xrobot_create_mod: { packageName: 'xrobot', moduleName: 'xrobot.ModuleCreator' },
+	xrobot_gen_main: { packageName: 'xrobot', moduleName: 'xrobot.GenerateMain' },
+	xrobot_init_mod: { packageName: 'xrobot', moduleName: 'xrobot.InitModule' },
+	xrobot_mod_parser: { packageName: 'xrobot', moduleName: 'xrobot.ModuleParser' },
+	xrobot_setup: { packageName: 'xrobot', moduleName: 'xrobot.XRobotSetup' },
+	xrobot_src_man: { packageName: 'xrobot', moduleName: 'xrobot.SourceManager' },
+	xr_cubemx_cfg: { packageName: 'libxr', moduleName: 'libxr.ConfigCubemxProject' },
+	xr_gen_code: { packageName: 'libxr', moduleName: 'libxr.GeneratorCode' },
+	xr_gen_code_stm32: { packageName: 'libxr', moduleName: 'libxr.GeneratorCodeSTM32' },
+	xr_parse: { packageName: 'libxr', moduleName: 'libxr.PeripheralAnalyzer' },
+	xr_parse_ioc: { packageName: 'libxr', moduleName: 'libxr.PeripheralAnalyzerSTM32' },
+	xr_stm32_cmake: { packageName: 'libxr', moduleName: 'libxr.GeneratorSTM32CMake' },
+	xr_stm32_flash: { packageName: 'libxr', moduleName: 'libxr.STM32FlashGenerator' },
+	xr_stm32_toolchain_switch: { packageName: 'libxr', moduleName: 'libxr.STM32ToolchainSwitch' },
+};
+
 export type OpenFileTarget = {
 	absolutePath: string;
 	displayPath: string;
@@ -2362,7 +2386,8 @@ async function runCommandCapture(cmd: string, args: string[]): Promise<{ ok: boo
 			resolve({ ok: false, stdout: '', stderr: 'No workspace' });
 			return;
 		}
-		const child = spawn(cmd, args, { cwd: root, shell: true, env: getCliEnv() });
+		const invocation = resolveCliInvocation(cmd);
+		const child = spawn(invocation.cmd, [...invocation.argsPrefix, ...args], { cwd: root, shell: true, env: getCliEnv() });
 		let stdout = '';
 		let stderr = '';
 		child.stdout.on('data', (d: Buffer | string) => (stdout += d.toString()));
@@ -2560,10 +2585,11 @@ export function parseScalarInput(input: string): unknown {
 export function checkCliPrerequisites(): void {
 	// Release-time startup diagnostics: report missing runtime dependencies early.
 	const errors: string[] = [];
+	const optionalMessages: string[] = [];
 	const pythonCmd = detectPythonCommand();
 	const pythonAvailable = pythonCmd ? isPythonAvailable(pythonCmd) : false;
-	const hasXrobotCli = isAnyCommandAvailable(['xrobot_setup', 'xrobot_init_mod']);
-	const hasLibxrCli = isAnyCommandAvailable(['xr_parse_ioc', 'xr_gen_code_stm32', 'xr_cubemx_cfg']);
+	const hasXrobotCli = isAnyCliAvailable(['xrobot_setup', 'xrobot_init_mod']);
+	const hasLibxrCli = isAnyCliAvailable(['xr_parse_ioc', 'xr_gen_code_stm32', 'xr_cubemx_cfg']);
 
 	if (!isCommandAvailable('git')) {
 		errors.push('Missing tool: git');
@@ -2571,28 +2597,32 @@ export function checkCliPrerequisites(): void {
 	if (!pythonCmd || !pythonAvailable) {
 		errors.push('Missing tool: python (python/py/python3.x)');
 	}
-	if (!isPipAvailable(pythonAvailable ? pythonCmd : undefined)) {
-		errors.push('Missing tool: pip (python -m pip unavailable)');
-	}
-	if (pythonCmd && pythonAvailable && !hasXrobotCli && !hasPipPackage(pythonCmd, 'xrobot')) {
-		errors.push('Missing pip package: xrobot');
-	}
-	if (pythonCmd && pythonAvailable && !hasLibxrCli && !hasPipPackage(pythonCmd, 'libxr')) {
-		errors.push('Missing pip package: libxr');
+	if (pythonCmd && pythonAvailable && !isPipAvailable(pythonCmd)) {
+		optionalMessages.push('pip is not available from the selected Python');
 	}
 	if (!hasXrobotCli) {
-		errors.push('Missing executable in PATH: xrobot CLI (e.g. xrobot_setup)');
+		errors.push('Missing pip package: xrobot');
 	}
 	if (!hasLibxrCli) {
-		errors.push('Missing executable in PATH: libxr CLI (e.g. xr_parse_ioc / xr_cubemx_cfg)');
+		optionalMessages.push('Optional LibXR package/CLI is not available (e.g. xr_parse_ioc / xr_cubemx_cfg)');
 	}
 
 	if (errors.length === 0) {
+		if (optionalMessages.length > 0) {
+			outputChannel.appendLine('[INFO] Optional dependency check:');
+			for (const message of optionalMessages) {
+				outputChannel.appendLine(`[INFO] ${message}. LibXR actions may be unavailable.`);
+			}
+			outputChannel.appendLine('');
+		}
 		return;
 	}
 	outputChannel.appendLine('[ERROR] Dependency check failed:');
 	for (const e of errors) {
 		outputChannel.appendLine(`[ERROR] ${e}. Please install/configure it.`);
+	}
+	for (const message of optionalMessages) {
+		outputChannel.appendLine(`[INFO] ${message}. LibXR actions may be unavailable.`);
 	}
 	outputChannel.appendLine('');
 	outputChannel.show(true);
@@ -2603,6 +2633,19 @@ export function checkCliPrerequisites(): void {
 
 export function isAnyCommandAvailable(commands: string[]): boolean {
 	return commands.some((c) => isCommandAvailable(c));
+}
+
+function isAnyCliAvailable(commands: string[]): boolean {
+	return commands.some((c) => isCliAvailable(c));
+}
+
+function isCliAvailable(commandName: string): boolean {
+	if (isCommandAvailable(commandName)) {
+		return true;
+	}
+	const fallback = PYTHON_MODULE_CLI[commandName];
+	const pythonCmd = detectPythonCommand();
+	return Boolean(fallback && pythonCmd && isPythonModuleAvailable(pythonCmd, fallback.moduleName));
 }
 
 export function isCommandAvailable(commandName: string): boolean {
@@ -2676,13 +2719,33 @@ function isPipAvailable(pythonCmd: string | undefined): boolean {
 	return result.status === 0;
 }
 
-function hasPipPackage(pythonCmd: string, pkg: string): boolean {
-	const result = spawnSync(pythonCmd, ['-m', 'pip', 'show', pkg], {
+function isPythonModuleAvailable(pythonCmd: string, moduleName: string): boolean {
+	const result = spawnSync(pythonCmd, [
+		'-c',
+		'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)',
+		moduleName,
+	], {
 		shell: true,
 		env: getCliEnv(),
 		encoding: 'utf8',
 	});
-	return result.status === 0 && /Name:\s*/i.test(result.stdout ?? '');
+	return result.status === 0;
+}
+
+function resolveCliInvocation(commandName: string): CliInvocation {
+	if (isCommandAvailable(commandName)) {
+		return { cmd: commandName, argsPrefix: [], displayCmd: commandName };
+	}
+	const fallback = PYTHON_MODULE_CLI[commandName];
+	const pythonCmd = detectPythonCommand();
+	if (fallback && pythonCmd && isPythonModuleAvailable(pythonCmd, fallback.moduleName)) {
+		return {
+			cmd: pythonCmd,
+			argsPrefix: ['-m', fallback.moduleName],
+			displayCmd: `${pythonCmd} -m ${fallback.moduleName}`,
+		};
+	}
+	return { cmd: commandName, argsPrefix: [], displayCmd: commandName };
 }
 
 export async function runCli(request: CliRunRequest): Promise<void> {
@@ -2707,12 +2770,14 @@ export async function runCli(request: CliRunRequest): Promise<void> {
 		}
 	}
 
-	outputChannel.appendLine(`$ ${request.cmd}${args.length > 0 ? ` ${args.join(' ')}` : ''}`);
+	const invocation = resolveCliInvocation(request.cmd);
+	const spawnArgs = [...invocation.argsPrefix, ...args];
+	outputChannel.appendLine(`$ ${invocation.displayCmd}${args.length > 0 ? ` ${args.join(' ')}` : ''}`);
 	outputChannel.appendLine(`cwd: ${root}`);
 	outputChannel.appendLine('----');
 	outputChannel.show(true);
 
-	const child = spawn(request.cmd, args, {
+	const child = spawn(invocation.cmd, spawnArgs, {
 		cwd: root,
 		shell: true,
 		env: getCliEnv(),
@@ -2740,15 +2805,69 @@ export async function runCli(request: CliRunRequest): Promise<void> {
 
 export function getCliEnv(): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = { ...process.env };
-	const extraPath = vscode.workspace.getConfiguration('xrobot.cli').get<string>('extraPath', '').trim();
-	if (!extraPath) {
-		return env;
-	}
 	const pathKey = Object.keys(env).find((k) => k.toLowerCase() === 'path') ?? 'PATH';
 	const sep = process.platform === 'win32' ? ';' : ':';
 	const current = env[pathKey] ?? '';
-	env[pathKey] = current ? `${current}${sep}${extraPath}` : extraPath;
+	const pathEntries = splitPath(current, sep);
+	pathEntries.push(...getDefaultUserScriptPaths(env));
+
+	const extraPath = vscode.workspace.getConfiguration('xrobot.cli').get<string>('extraPath', '').trim();
+	pathEntries.push(...splitPath(extraPath, sep));
+	env[pathKey] = dedupePathEntries(pathEntries).join(sep);
 	return env;
+}
+
+function splitPath(value: string, sep: string): string[] {
+	return value
+		.split(sep)
+		.map((entry) => entry.trim())
+		.filter(Boolean);
+}
+
+function dedupePathEntries(entries: string[]): string[] {
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const entry of entries) {
+		const key = process.platform === 'win32' ? entry.toLowerCase() : entry;
+		if (seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		result.push(entry);
+	}
+	return result;
+}
+
+function getDefaultUserScriptPaths(env: NodeJS.ProcessEnv): string[] {
+	const paths: string[] = [];
+	const pythonUserBase = env.PYTHONUSERBASE;
+	if (pythonUserBase) {
+		paths.push(process.platform === 'win32' ? path.join(pythonUserBase, 'Scripts') : path.join(pythonUserBase, 'bin'));
+	}
+	if (process.platform === 'win32') {
+		const appData = env.APPDATA;
+		if (appData) {
+			const pythonRoot = path.join(appData, 'Python');
+			paths.push(...findWindowsPythonUserScriptDirs(pythonRoot));
+		}
+	} else {
+		const home = env.HOME;
+		if (home) {
+			paths.push(path.join(home, '.local', 'bin'));
+		}
+	}
+	return paths;
+}
+
+function findWindowsPythonUserScriptDirs(pythonRoot: string): string[] {
+	try {
+		return fs
+			.readdirSync(pythonRoot, { withFileTypes: true })
+			.filter((entry) => entry.isDirectory() && /^Python\d+$/i.test(entry.name))
+			.map((entry) => path.join(pythonRoot, entry.name, 'Scripts'));
+	} catch {
+		return [];
+	}
 }
 
 export async function openWorkspaceFile(target: OpenFileTarget | string): Promise<void> {
