@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/xrobot-org/xrobot-vscode-extension"
   },
-  "homepage": "https://xrobot-org.github.io/",
+  "homepage": "https://xrobot.work/",
   "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.108.0"

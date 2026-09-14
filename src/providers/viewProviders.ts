@@ -117,7 +117,12 @@ type RefQuickPickItem = vscode.QuickPickItem & {
 };
 
 export const outputChannel = vscode.window.createOutputChannel('XRobot');
-export const PROTECTED_SOURCE_URL = 'https://xrobot-org.github.io/xrobot-modules/index.yaml';
+export const PROTECTED_SOURCE_URL = 'https://xrobot.work/xrobot-modules/index.yaml';
+
+export function isProtectedSourceUrl(url: string): boolean {
+	return url === PROTECTED_SOURCE_URL
+		|| url === 'https://xrobot-org.github.io/xrobot-modules/index.yaml';
+}
 export { isLikelyXrobotConfig } from './xrobotConfigUtils';
 export { discoverUserLibxrConfigs, discoverUserXrobotConfigs } from './workspaceConfigDiscovery';
 
@@ -640,7 +645,7 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		for (const [idx, src] of combinedSources.entries()) {
 			const children: TreeNode[] = [];
 			if (src.kind === 'remote') {
-				if (src.url === PROTECTED_SOURCE_URL) {
+				if (isProtectedSourceUrl(src.url)) {
 					children.push(messageNode(`priority: ${src.priority ?? PRIORITY_UNSET_LABEL}`));
 					children.push(messageNode(`url: ${src.url}`));
 					children.push(messageNode(`mirror: ${src.mirror ?? MIRROR_NONE_LABEL}`));
@@ -1822,7 +1827,7 @@ export async function editSourceUrl(index: number): Promise<void> {
 		return;
 	}
 	const current = String(source.url ?? '');
-	if (current === PROTECTED_SOURCE_URL) {
+	if (isProtectedSourceUrl(current)) {
 		vscode.window.showInformationMessage('This default source is protected and cannot be modified.');
 		return;
 	}
@@ -1903,7 +1908,7 @@ export async function deleteSource(index: number): Promise<void> {
 	if (!source) {
 		return;
 	}
-	if (String(source.url ?? '') === PROTECTED_SOURCE_URL) {
+	if (isProtectedSourceUrl(String(source.url ?? ''))) {
 		vscode.window.showInformationMessage('This default source is protected and cannot be deleted.');
 		return;
 	}

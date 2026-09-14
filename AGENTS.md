@@ -56,6 +56,6 @@ Provide a lightweight VS Code sidebar experience for XRobot + LibXR with:
   - `Modules/sources.yaml`
   - selected LibXR config file under `User/**`
 - Protected source URL should not be editable/deletable:
-  - `https://xrobot-org.github.io/xrobot-modules/index.yaml`
+  - `https://xrobot.work/xrobot-modules/index.yaml`
 - Alias editing in hardware container must keep at least one alias.
 - Alias editing in hardware container uses validated write-back (post-write parse check + rollback on failure).
