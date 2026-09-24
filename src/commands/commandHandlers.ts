@@ -1,19 +1,13 @@
 import * as vscode from 'vscode';
 import {
-	addHardwareAlias,
-	addModuleManifestKeyValue,
-	addModuleManifestString,
 	addModuleInstance,
 	addRepoEntry,
 	addSourceEntry,
 	checkCliPrerequisites,
 	createModuleWizard,
-	deleteHardwareAlias,
-	deleteModuleManifestEntry,
 	deleteModuleInstance,
 	deleteRepo,
 	deleteSource,
-	editHardwareAlias,
 	editModuleInstance,
 	editRepoName,
 	editRepoVersion,
@@ -27,12 +21,12 @@ import {
 	pickLibxrConfigPath,
 	pickWorkspaceFileForSetting,
 	pickXrobotConfigPath,
-	renameModuleManifestKey,
 	registerWatchers,
 	runCli,
 	type CliRunRequest,
 	type OpenFileTarget,
 } from '../providers/viewProviders';
+import type { InstanceEditTarget } from '../providers/instanceEditor';
 
 export { checkCliPrerequisites, registerWatchers };
 
@@ -48,6 +42,7 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	context.subscriptions.push(
 		vscode.commands.registerCommand('xrobot.runCli', async (request: CliRunRequest) => {
 			await runCli(request);
+			refreshAll();
 		}),
 		vscode.commands.registerCommand('xrobot.openFile', async (target: OpenFileTarget | string) => {
 			await openWorkspaceFile(target);
@@ -84,22 +79,6 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 			await editYamlScalar(filePath, keyPath);
 			refreshAll();
 		}),
-		vscode.commands.registerCommand('xrobot.addModuleManifestKeyValue', async (filePath: string, section: string) => {
-			await addModuleManifestKeyValue(filePath, section);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.addModuleManifestString', async (filePath: string, section: string) => {
-			await addModuleManifestString(filePath, section);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.renameModuleManifestKey', async (filePath: string, section: string, index: number) => {
-			await renameModuleManifestKey(filePath, section, index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.deleteModuleManifestEntry', async (filePath: string, section: string, index: number) => {
-			await deleteModuleManifestEntry(filePath, section, index);
-			refreshAll();
-		}),
 		vscode.commands.registerCommand('xrobot.createModuleWizard', async () => {
 			await createModuleWizard();
 			refreshAll();
@@ -108,12 +87,12 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 			await addModuleInstance();
 			refreshAll();
 		}),
-		vscode.commands.registerCommand('xrobot.editModuleInstance', async (index: number) => {
-			await editModuleInstance(index);
+		vscode.commands.registerCommand('xrobot.editModuleInstance', async (instanceId?: string, target?: InstanceEditTarget) => {
+			await editModuleInstance(instanceId, target);
 			refreshAll();
 		}),
-		vscode.commands.registerCommand('xrobot.deleteModuleInstance', async (index: number) => {
-			await deleteModuleInstance(index);
+		vscode.commands.registerCommand('xrobot.deleteModuleInstance', async (instanceId?: string) => {
+			await deleteModuleInstance(instanceId);
 			refreshAll();
 		}),
 	);
@@ -156,21 +135,6 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 		}),
 		vscode.commands.registerCommand('xrobot.deleteSource', async (index: number) => {
 			await deleteSource(index);
-			refreshAll();
-		}),
-	);
-
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.addHardwareAlias', async (entryKey: string) => {
-			await addHardwareAlias(entryKey);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editHardwareAlias', async (entryKey: string, aliasIndex: number) => {
-			await editHardwareAlias(entryKey, aliasIndex);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.deleteHardwareAlias', async (entryKey: string, aliasIndex: number) => {
-			await deleteHardwareAlias(entryKey, aliasIndex);
 			refreshAll();
 		}),
 	);

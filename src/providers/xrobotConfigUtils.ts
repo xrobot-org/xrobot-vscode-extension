@@ -12,11 +12,13 @@ function readYamlRoot(filePath: string): Record<string, unknown> | undefined {
 	return asRecord(parsed.value);
 }
 
+// XRobot application config: `modules: [{module, id, template_args?, args?}]` and/or
+// `settings: {monitor_sleep_ms}`.
 export function isLikelyXrobotConfig(root: Record<string, unknown>): boolean {
 	if (Array.isArray(root.modules)) {
 		return true;
 	}
-	if (asRecord(root.global_settings)) {
+	if (asRecord(root.settings)) {
 		return true;
 	}
 	return false;

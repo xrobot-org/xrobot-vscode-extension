@@ -142,18 +142,6 @@
       {
         "command": "xrobot.deleteSource",
         "title": "XRobot: Delete Source"
-      },
-      {
-        "command": "xrobot.addHardwareAlias",
-        "title": "XRobot: Add Hardware Alias"
-      },
-      {
-        "command": "xrobot.editHardwareAlias",
-        "title": "XRobot: Edit Hardware Alias"
-      },
-      {
-        "command": "xrobot.deleteHardwareAlias",
-        "title": "XRobot: Delete Hardware Alias"
       }
     ],
     "menus": {

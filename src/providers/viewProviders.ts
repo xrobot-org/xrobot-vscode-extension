@@ -2,11 +2,33 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { isCollection, parseDocument, stringify as stringifyYaml } from 'yaml';
 import { asRecord, parseYamlSafe } from '../yaml/yamlStore';
 import { hasUsableXrobotConfig } from './xrobotConfigUtils';
-import { guardedWriteYamlRoot } from './yamlWriteGuard';
 import { discoverUserLibxrConfigs, discoverUserXrobotConfigs } from './workspaceConfigDiscovery';
+import {
+	XROBOT_ENTRY_HEADER,
+	XROBOT_LOCK_FILE,
+	buildDescribeArgs,
+	buildGenMainArgs,
+	buildInstanceAddArgs,
+	buildInstanceRemoveArgs,
+	buildInstanceSetArgs,
+	buildSetupArgs,
+	changedEntryInputs,
+	describeSummary,
+	formatCommandLine,
+	isCppIdentifier,
+	parseDescribeOutput,
+	previewTree,
+	shortCommit,
+	type DescribeInstance,
+	type DescribeResult,
+	type NamedValue,
+	type ValueTree,
+	type XrobotPaths,
+} from './describeModel';
+import { editInstanceInteractively, type InstanceEditTarget } from './instanceEditor';
 import {
 	MIRROR_NONE_LABEL,
 	PRIORITY_UNSET_LABEL,
@@ -37,6 +59,8 @@ type GroupNode = {
 	children: TreeNode[];
 	expanded?: boolean;
 	description?: string;
+	iconId?: string;
+	tooltip?: string;
 };
 
 type FileNode = {
@@ -77,6 +101,8 @@ type MessageNode = {
 	type: 'message';
 	label: string;
 	description?: string;
+	iconId?: string;
+	tooltip?: string;
 };
 
 type OpNode = {
@@ -214,7 +240,6 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			platformItem,
 			systemItem,
 			groupNode(flashLabel, flashLayoutNodes, false),
-			groupNode('Hardware Container', this.buildHardwareContainerNodes(ctx), false),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
 			appMainItem,
@@ -290,41 +315,6 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return nodes;
 	}
 
-	private buildHardwareContainerNodes(ctx: WorkspaceContext): TreeNode[] {
-		const rootObj = this.readLibxrConfigRoot(ctx);
-		if (!rootObj) {
-			return [messageNode(`${ctx.libxrConfigRel} (missing or invalid)`)];
-		}
-		const aliases = asRecord(rootObj.device_aliases);
-		if (!aliases) {
-			return [messageNode('(missing) device_aliases')];
-		}
-
-		const nodes: TreeNode[] = [];
-		for (const [name, raw] of Object.entries(aliases)) {
-			const aliasObj = asRecord(raw);
-			const children: TreeNode[] = [opNode('add alias', 'xrobot.addHardwareAlias', [name], undefined, 'add')];
-			if (aliasObj?.type !== undefined) {
-				children.push(messageNode(`type: ${String(aliasObj.type)}`));
-			}
-			const aliasList = Array.isArray(aliasObj?.aliases) ? aliasObj.aliases.map((a) => String(a)) : [];
-			aliasList.forEach((alias, idx) => {
-				const aliasChildren: TreeNode[] = [
-					opNode('edit alias', 'xrobot.editHardwareAlias', [name, idx], undefined, 'edit'),
-				];
-				if (aliasList.length > 1) {
-					aliasChildren.push(
-						opNode('delete alias', 'xrobot.deleteHardwareAlias', [name, idx], undefined, 'trash'),
-					);
-				}
-				children.push(groupNode(`alias: ${alias}`, aliasChildren, false));
-			});
-			nodes.push(groupNode(name, children.length > 0 ? children : [messageNode('(empty)')], false));
-		}
-
-		return nodes.length > 0 ? nodes : [messageNode('(empty) device_aliases')];
-	}
-
 	private readLibxrConfigRoot(ctx: WorkspaceContext): Record<string, unknown> | undefined {
 		const parsed = parseYamlSafe(ctx.libxrConfigAbs);
 		if (!parsed.ok) {
@@ -366,8 +356,8 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 						? `-i ${parseIocOut} -o ${appMainArg} --xrobot --libxr-config ${libxrConfigArg}`
 						: `-i ${parseIocOut} -o ${appMainArg} --libxr-config ${libxrConfigArg}`,
 					inputPrompt: withXrobot
-						? `Example: -i ${parseIocOut} -o ${appMainArg} --xrobot --hw-cntr --libxr-config ${libxrConfigArg}`
-						: `Example: -i ${parseIocOut} -o ${appMainArg} --hw-cntr --libxr-config ${libxrConfigArg}`,
+						? `Example: -i ${parseIocOut} -o ${appMainArg} --xrobot --libxr-config ${libxrConfigArg}`
+						: `Example: -i ${parseIocOut} -o ${appMainArg} --libxr-config ${libxrConfigArg}`,
 				}),
 				actionNode('Show STM32 Flash Info (xr_stm32_flash)', {
 					label: 'xr_stm32_flash',
@@ -398,12 +388,13 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	}
 }
 
-// Provider: XRobot view tree
+// Provider: XRobot view tree (driven by xrobot_describe; the extension never reads C++ itself)
 export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private readonly onDidChangeEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 	public readonly onDidChangeTreeData = this.onDidChangeEmitter.event;
 
 	refresh(): void {
+		invalidateXrobotDescribe();
 		this.onDidChangeEmitter.fire(undefined);
 	}
 
@@ -411,7 +402,7 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return createTreeItem(element);
 	}
 
-	getChildren(element?: TreeNode): TreeNode[] {
+	async getChildren(element?: TreeNode): Promise<TreeNode[]> {
 		const ctx = getWorkspaceContext();
 		if (!ctx) {
 			return [messageNode('Open a workspace folder to use XRobot extension.')];
@@ -436,7 +427,7 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return [];
 	}
 
-	private buildRoot(ctx: WorkspaceContext): TreeNode[] {
+	private async buildRoot(ctx: WorkspaceContext): Promise<TreeNode[]> {
 		if (!ctx.hasXrobotConfig) {
 			return [
 				groupNode(
@@ -451,32 +442,107 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 				),
 			];
 		}
+		const paths = xrobotPathsFor(ctx);
+		const outcome = await awaitXrobotDescribe(paths);
+		const describe = outcome.ok ? outcome.value : undefined;
 		return [
-			groupNode('Current Workspace', this.buildCurrentWorkspace(ctx), false),
-			groupNode('Modules', this.buildModules(ctx), false),
+			groupNode(
+				'Status',
+				this.buildStatus(outcome),
+				false,
+				describe ? describeSummary(describe) : 'xrobot_describe failed',
+			),
+			groupNode('Current Workspace', this.buildCurrentWorkspace(ctx, describe), false),
+			groupNode('Modules', this.buildModules(ctx, describe), false),
 			groupNode('Sources', this.buildSources(ctx), false),
-			groupNode('Actions', this.buildActions(ctx), false),
+			groupNode('Actions', this.buildActions(paths), false),
 		];
 	}
 
-	private buildCurrentWorkspace(ctx: WorkspaceContext): TreeNode[] {
-		const instanceChildren = this.buildInstanceNodes(ctx);
-		const globalSettingsChildren = this.buildGlobalSettingsNodes(ctx);
+	private buildStatus(outcome: DescribeOutcome): TreeNode[] {
+		if (!outcome.ok) {
+			return [
+				messageNode(`xrobot_describe failed: ${outcome.error}`, undefined, { iconId: 'error', tooltip: outcome.error }),
+				messageNode('Needs the xrobot package with xrobot_describe; see "XRobot" output', undefined, { iconId: 'info' }),
+			];
+		}
+		const describe = outcome.value;
+		const lock = describe.lock;
+		const lockChildren: TreeNode[] = [];
+		if (!lock.present) {
+			lockChildren.push(messageNode(`${lock.path} absent; run Update lock (xrobot_setup --update)`, undefined, { iconId: 'warning' }));
+		}
+		for (const mod of lock.modules) {
+			const head = mod.head && mod.head !== mod.commit ? `, head ${shortCommit(mod.head)}` : '';
+			lockChildren.push(
+				messageNode(mod.id, `${shortCommit(mod.commit)} ${mod.status}${head}`, {
+					iconId: statusIconId(mod.status),
+					tooltip: `${mod.id}\nlocked: ${mod.commit}\nhead: ${mod.head ?? '(not checked out)'}`,
+				}),
+			);
+		}
+		if (lock.present && lock.modules.length === 0) {
+			lockChildren.push(messageNode('(empty) lock'));
+		}
+
+		const entry = describe.entry;
+		const changed = changedEntryInputs(entry);
+		const entryLabel =
+			entry.status === 'stale' && changed.length > 0
+				? `Entry header: stale (${changed.map((i) => `${i.kind} ${i.path}`).join(', ')} changed)`
+				: `Entry header: ${entry.status}`;
+		const entryChildren: TreeNode[] = entry.inputs.map((input) =>
+			messageNode(`${input.kind}: ${input.path}`, input.status, {
+				iconId: statusIconId(input.status),
+				tooltip: `recorded: ${input.recorded ?? '-'}\ncurrent: ${input.current ?? '-'}`,
+			}),
+		);
+		if (entry.tool) {
+			entryChildren.push(messageNode(`generated by ${entry.tool}`));
+		}
+		if (entry.status === 'missing' || entry.status === 'unstamped') {
+			entryChildren.push(messageNode('run Regenerate entry (xrobot_gen_main)', undefined, { iconId: 'info' }));
+		}
+
+		const diagnosticNodes: TreeNode[] = describe.diagnostics.map((d) =>
+			messageNode(`${d.scope}: ${d.message}`, d.severity, {
+				iconId: d.severity === 'error' ? 'error' : 'warning',
+				tooltip: `[${d.severity}] ${d.scope}\n${d.message}`,
+			}),
+		);
+		const errorCount = describe.diagnostics.filter((d) => d.severity === 'error').length;
+
+		return [
+			groupNode(`Lock: ${lock.status}`, lockChildren.length > 0 ? lockChildren : [messageNode('(empty)')], false, lock.path, {
+				iconId: statusIconId(lock.status),
+			}),
+			groupNode(entryLabel, entryChildren.length > 0 ? entryChildren : [messageNode('(no stamp inputs)')], false, entry.path, {
+				iconId: statusIconId(entry.status),
+			}),
+			groupNode(
+				'Diagnostics',
+				diagnosticNodes.length > 0 ? diagnosticNodes : [messageNode('no diagnostics', undefined, { iconId: 'pass' })],
+				errorCount > 0,
+				`${errorCount} errors, ${describe.diagnostics.length - errorCount} warnings`,
+				{ iconId: errorCount > 0 ? 'error' : describe.diagnostics.length > 0 ? 'warning' : 'pass' },
+			),
+		];
+	}
+
+	private buildCurrentWorkspace(ctx: WorkspaceContext, describe: DescribeResult | undefined): TreeNode[] {
+		const instanceChildren = this.buildInstanceNodes(ctx, describe);
+		const settingsChildren = this.buildSettingsNodes(ctx);
 		const configCandidates = ctx.xrobotConfigCandidates.map((rel) =>
 			fileNode(rel, path.join(ctx.root, rel), rel, false),
 		);
 		const instanceOps = [
-			opNode('add instance (xrobot_add_mod)', 'xrobot.addModuleInstance', [], undefined, 'add'),
+			opNode('add instance (xrobot_instance add)', 'xrobot.addModuleInstance', [], undefined, 'add'),
 			...instanceChildren,
 		];
 		const currentConfigChildren: TreeNode[] = [
 			opNode('switch current config', 'xrobot.pickXrobotConfigPath', [], undefined, 'edit'),
-			groupNode(
-				'Global Settings',
-				globalSettingsChildren.length > 0 ? globalSettingsChildren : [messageNode('(empty)')],
-				true,
-			),
-			groupNode('Instances', instanceOps.length > 0 ? instanceOps : [messageNode('(empty)')], true),
+			groupNode('Settings', settingsChildren.length > 0 ? settingsChildren : [messageNode('(empty)')], true),
+			groupNode('Instances', instanceOps, true),
 		];
 
 		return [
@@ -485,34 +551,36 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		];
 	}
 
-	private buildModules(ctx: WorkspaceContext): TreeNode[] {
-		const repoChildren = this.buildRepoNodes(ctx);
+	private buildModules(ctx: WorkspaceContext, describe: DescribeResult | undefined): TreeNode[] {
+		const repoChildren = this.buildRepoNodes(ctx, describe);
 		return [
 			groupNode('Repos', repoChildren.length > 0 ? repoChildren : [messageNode('(empty)')], true),
 		];
 	}
 
-	private buildGlobalSettingsNodes(ctx: WorkspaceContext): TreeNode[] {
+	private buildSettingsNodes(ctx: WorkspaceContext): TreeNode[] {
 		const configPath = ctx.xrobotConfigAbs;
-		if (!fs.existsSync(configPath)) {
-			return [messageNode(`${ctx.xrobotConfigRel} (missing)`)];
-		}
-
 		const parsed = parseYamlSafe(configPath);
 		if (!parsed.ok) {
 			return [messageNode(`Parse error: ${parsed.error}`)];
 		}
-
-		const rootObj = asRecord(parsed.value);
-		const globalSettings = asRecord(rootObj?.global_settings);
-		if (!globalSettings) {
-			return [messageNode('(missing) global_settings')];
+		const settings = asRecord(asRecord(parsed.value)?.settings) ?? {};
+		const nodes = toYamlValueNodes(settings, 0, configPath, ['settings'], true);
+		if (!Object.prototype.hasOwnProperty.call(settings, 'monitor_sleep_ms')) {
+			nodes.push(
+				opNode(
+					'monitor_sleep_ms',
+					'xrobot.editYamlScalar',
+					[configPath, ['settings', 'monitor_sleep_ms']],
+					'default 1000',
+					'symbol-field',
+				),
+			);
 		}
-
-		return toYamlValueNodes(globalSettings, 0, configPath, ['global_settings'], true);
+		return nodes;
 	}
 
-	private buildRepoNodes(ctx: WorkspaceContext): TreeNode[] {
+	private buildRepoNodes(ctx: WorkspaceContext, describe: DescribeResult | undefined): TreeNode[] {
 		const modulesPath = path.join(ctx.root, 'Modules', 'modules.yaml');
 		const nodes: TreeNode[] = [opNode('add repo', 'xrobot.addRepo', [], undefined, 'add')];
 		if (!fs.existsSync(modulesPath)) {
@@ -542,17 +610,23 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 				),
 				opNode('delete', 'xrobot.deleteRepo', [index], undefined, 'trash'),
 			];
-			const headerPath = findLocalModuleHeader(ctx.root, parsedSpec.repo);
-			if (headerPath) {
+			const locked = describe?.lock.modules.find((m) => m.id === parsedSpec.repo);
+			if (locked) {
+				repoChildren.push(
+					messageNode(`locked: ${shortCommit(locked.commit)}`, locked.status, { iconId: statusIconId(locked.status) }),
+				);
+			}
+			const described = describe?.modules[parsedSpec.repo];
+			const headerPath = described?.header
+				? path.join(ctx.root, described.header)
+				: findLocalModuleHeader(ctx.root, parsedSpec.repo);
+			if (headerPath && fs.existsSync(headerPath)) {
 				repoChildren.push(fileNode('module header', headerPath, toWorkspacePath(ctx.root, headerPath), 'none'));
-				const manifestRoot = readModuleManifestRoot(headerPath);
-				if (manifestRoot) {
-					repoChildren.push(groupNode('module_manifest', buildModuleManifestNodes(manifestRoot, headerPath), true));
-				} else {
-					repoChildren.push(messageNode('module manifest parse failed'));
-				}
 			} else {
-				repoChildren.push(messageNode('module source not found locally; run xrobot_init_mod first'));
+				repoChildren.push(messageNode('module source not found locally; run xrobot_setup --frozen'));
+			}
+			if (described?.error) {
+				repoChildren.push(messageNode(`interface error: ${described.error}`, undefined, { iconId: 'error', tooltip: described.error }));
 			}
 			nodes.push(
 				groupNode(
@@ -565,55 +639,79 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return nodes;
 	}
 
-	private buildInstanceNodes(ctx: WorkspaceContext): TreeNode[] {
-		const userPath = ctx.xrobotConfigAbs;
-		if (!fs.existsSync(userPath)) {
-			return [messageNode(`${ctx.xrobotConfigRel} (missing)`)];
+	private buildInstanceNodes(ctx: WorkspaceContext, describe: DescribeResult | undefined): TreeNode[] {
+		const instances = describe ? describe.instances : readYamlInstances(ctx.xrobotConfigAbs);
+		if (!instances) {
+			return [messageNode(`${ctx.xrobotConfigRel} (missing or invalid)`)];
 		}
-
-		const parsed = parseYamlSafe(userPath);
-		if (!parsed.ok) {
-			return [messageNode(`Parse error: ${parsed.error}`)];
-		}
-
-		const obj = asRecord(parsed.value);
-		const modules = Array.isArray(obj?.modules) ? obj?.modules : [];
-		const nodes: TreeNode[] = [];
-
-		for (const [index, entry] of modules.entries()) {
-			const item = asRecord(entry);
-			if (!item) {
-				nodes.push(messageNode(String(entry)));
-				continue;
-			}
-			const id = item.id !== undefined ? String(item.id) : '-';
-			const name = item.name !== undefined ? String(item.name) : '(no-name)';
-			const child: TreeNode[] = [];
-			child.push(opNode(`id: ${id}`, 'xrobot.editModuleInstance', [index], undefined, 'edit'));
-			child.push(opNode(`name: ${name}`, 'xrobot.editModuleInstance', [index], undefined, 'edit'));
-			if (item.constructor_args !== undefined) {
-				child.push(
-					groupNode(
-						'constructor_args',
-						toYamlValueNodes(item.constructor_args, 0, userPath, ['modules', index, 'constructor_args'], true),
-						true,
+		return instances.map((instance) => {
+			const module = describe?.modules[instance.module];
+			const children: TreeNode[] = [];
+			if (module?.header) {
+				const headerAbs = path.join(ctx.root, module.header);
+				children.push(
+					fileNode(`module: ${instance.module}`, headerAbs, module.header, 'none', { description: module.class }),
+				);
+			} else {
+				children.push(
+					messageNode(
+						`module: ${instance.module}`,
+						describe ? 'not in locked sources' : undefined,
+						{ iconId: describe ? 'warning' : 'package' },
 					),
 				);
 			}
-			if (item.template_args !== undefined) {
-				child.push(
-					groupNode(
-						'template_args',
-						toYamlValueNodes(item.template_args, 0, userPath, ['modules', index, 'template_args'], true),
-						true,
-					),
+			children.push(opNode(`id: ${instance.id}`, 'xrobot.editModuleInstance', [instance.id, { kind: 'id' }], 'rename', 'edit'));
+
+			const templateParams = module?.template_parameters ?? [];
+			const templateCount = Math.max(templateParams.length, instance.template_args.length);
+			if (templateCount > 0) {
+				const templateNodes: TreeNode[] = [];
+				for (let i = 0; i < templateCount; i += 1) {
+					const name = templateParams[i]?.name ?? `#${i}`;
+					templateNodes.push(
+						opNode(
+							`${name}: ${previewTree(instance.template_args[i] ?? null)}`,
+							'xrobot.editModuleInstance',
+							[instance.id, { kind: 'template', index: i }],
+							templateParams[i]?.type,
+							'symbol-type-parameter',
+						),
+					);
+				}
+				children.push(groupNode('template_args', templateNodes, false));
+			}
+
+			const argNodes: TreeNode[] = instance.args.map((arg) => this.buildArgNode(instance, arg));
+			if ((module?.constructors?.length ?? 0) > 1) {
+				argNodes.push(
+					opNode('switch constructor', 'xrobot.editModuleInstance', [instance.id, { kind: 'constructor' }], 'resets args', 'list-ordered'),
 				);
 			}
-			child.push(opNode('delete instance', 'xrobot.deleteModuleInstance', [index], undefined, 'trash'));
-			nodes.push(groupNode(`${id} / ${name}`, child.length > 0 ? child : [messageNode('(no args)')]));
-		}
+			children.push(groupNode('args', argNodes.length > 0 ? argNodes : [messageNode('(no args)')], false));
+			children.push(opNode('delete instance', 'xrobot.deleteModuleInstance', [instance.id], undefined, 'trash'));
+			return groupNode(instance.id, children, false, module?.class ?? instance.module, { iconId: 'symbol-class' });
+		});
+	}
 
-		return nodes;
+	private buildArgNode(instance: DescribeInstance, arg: NamedValue): TreeNode {
+		const names = Object.keys(arg);
+		const name = names.length === 1 ? names[0] : '?';
+		const value = arg[name];
+		const edit: InstanceEditTarget = { kind: 'arg', name };
+		if (value !== null && typeof value === 'object') {
+			return groupNode(
+				name,
+				[
+					opNode(`edit ${name}`, 'xrobot.editModuleInstance', [instance.id, edit], undefined, 'edit'),
+					...toYamlValueNodes(value, 0),
+				],
+				false,
+				previewTree(value),
+				{ iconId: 'symbol-structure', tooltip: previewTree(value, 2000) },
+			);
+		}
+		return opNode(`${name}: ${previewTree(value)}`, 'xrobot.editModuleInstance', [instance.id, edit], undefined, 'symbol-field');
 	}
 
 	private buildSources(ctx: WorkspaceContext): TreeNode[] {
@@ -703,28 +801,33 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return nodes;
 	}
 
-	private buildActions(ctx: WorkspaceContext): TreeNode[] {
+	private buildActions(paths: XrobotPaths): TreeNode[] {
 		return [
 			actionNode('Setup Workspace (xrobot_setup)', {
 				label: 'xrobot_setup',
 				cmd: 'xrobot_setup',
+				args: buildSetupArgs(paths),
+			}),
+			actionNode('Resolve locked sources (xrobot_setup --frozen)', {
+				label: 'xrobot_setup --frozen',
+				cmd: 'xrobot_setup',
+				args: buildSetupArgs(paths, 'frozen'),
+			}),
+			actionNode('Update lock (xrobot_setup --update)', {
+				label: 'xrobot_setup --update',
+				cmd: 'xrobot_setup',
+				args: buildSetupArgs(paths, 'update'),
+			}),
+			actionNode('Regenerate entry (xrobot_gen_main)', {
+				label: 'xrobot_gen_main',
+				cmd: 'xrobot_gen_main',
+				args: buildGenMainArgs(paths),
 			}),
 			actionNode('Init Modules (xrobot_init_mod)', {
 				label: 'xrobot_init_mod',
 				cmd: 'xrobot_init_mod',
 				promptInput: true,
 				defaultInput: '--config Modules/modules.yaml --directory Modules --sources Modules/sources.yaml',
-			}),
-			actionNode('Add Module Instance (xrobot_add_mod)', {
-				label: 'xrobot_add_mod',
-				cmd: 'xrobot_add_mod',
-				promptInput: true,
-				defaultInput: `BlinkLED --config ${ctx.xrobotConfigRel}`,
-			}),
-			actionNode('Generate Main Header (xrobot_gen_main)', {
-				label: 'xrobot_gen_main',
-				cmd: 'xrobot_gen_main',
-				args: ['--output', 'User/xrobot_main.hpp', '--config', ctx.xrobotConfigRel],
 			}),
 			opNode('Create Module', 'xrobot.createModuleWizard', [], undefined, 'new-file'),
 		];
@@ -738,7 +841,8 @@ function createTreeItem(node: TreeNode): vscode.TreeItem {
 			node.expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
 		);
 		item.description = node.description ?? `${node.children.length} items`;
-		item.iconPath = new vscode.ThemeIcon(groupIconId(node.label));
+		item.tooltip = node.tooltip;
+		item.iconPath = new vscode.ThemeIcon(node.iconId ?? groupIconId(node.label));
 		return item;
 	}
 
@@ -821,7 +925,8 @@ function createTreeItem(node: TreeNode): vscode.TreeItem {
 
 	const msg = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
 	msg.description = node.description;
-	msg.iconPath = new vscode.ThemeIcon(messageIconId(node.label));
+	msg.tooltip = node.tooltip;
+	msg.iconPath = new vscode.ThemeIcon(node.iconId ?? messageIconId(node.label));
 	return msg;
 }
 
@@ -838,7 +943,7 @@ function yamlChildrenForFile(node: FileNode): TreeNode[] {
 		if (rootObj) {
 			const filtered: Record<string, unknown> = {};
 			for (const [k, v] of Object.entries(rootObj)) {
-				if (k === 'device_aliases' || k === 'SYSTEM' || k === 'FlashLayout') {
+				if (k === 'SYSTEM' || k === 'FlashLayout') {
 					continue;
 				}
 				filtered[k] = v;
@@ -976,8 +1081,14 @@ function previewValue(value: unknown): string {
 	return String(value);
 }
 
-function groupNode(label: string, children: TreeNode[], expanded = false, description?: string): GroupNode {
-	return { type: 'group', label, children, expanded, description };
+function groupNode(
+	label: string,
+	children: TreeNode[],
+	expanded = false,
+	description?: string,
+	options?: { iconId?: string; tooltip?: string },
+): GroupNode {
+	return { type: 'group', label, children, expanded, description, iconId: options?.iconId, tooltip: options?.tooltip };
 }
 
 function sourceSummary(source: SourceItem): string {
@@ -1060,8 +1171,25 @@ function urlNode(label: string, url: string, description?: string): UrlNode {
 	return { type: 'url', label, url, description };
 }
 
-function messageNode(label: string, description?: string): MessageNode {
-	return { type: 'message', label, description };
+function messageNode(label: string, description?: string, options?: { iconId?: string; tooltip?: string }): MessageNode {
+	return { type: 'message', label, description, iconId: options?.iconId, tooltip: options?.tooltip };
+}
+
+function statusIconId(status: string): string {
+	switch (status) {
+		case 'ok':
+		case 'fresh':
+			return 'pass';
+		case 'stale':
+		case 'mismatch':
+		case 'unstamped':
+		case 'absent':
+			return 'warning';
+		case 'missing':
+			return 'error';
+		default:
+			return 'info';
+	}
 }
 
 function groupIconId(label: string): string {
@@ -1078,10 +1206,13 @@ function groupIconId(label: string): string {
 			return 'repo-clone';
 		case 'Instances':
 			return 'symbol-class';
-		case 'Global Settings':
+		case 'Settings':
 			return 'settings-gear';
-		case 'Hardware Container':
-			return 'circuit-board';
+		case 'Status':
+			return 'pulse';
+		case 'args':
+		case 'template_args':
+			return 'symbol-parameter';
 		case 'Config Files':
 			return 'files';
 		case 'Source Manager (xrobot_src_man)':
@@ -1358,229 +1489,45 @@ function findLocalModuleHeader(root: string, repoSpec: string): string | undefin
 	if (!moduleName) {
 		return undefined;
 	}
-	const moduleDir = path.join(root, 'Modules', moduleName);
-	const headerCandidates = [
+	// Locked sources live in Modules/<owner>/<Repo>; older workspaces used Modules/<Repo>.
+	const moduleDirs = [path.join(root, 'Modules', ...parts.filter((p) => p.length > 0)), path.join(root, 'Modules', moduleName)];
+	const headerCandidates = moduleDirs.flatMap((moduleDir) => [
 		path.join(moduleDir, `${moduleName}.hpp`),
 		path.join(moduleDir, `${moduleName}.h`),
-	];
+	]);
 	return headerCandidates.find((candidate) => fs.existsSync(candidate));
 }
 
-function normalizeManifestKeyValueList(value: unknown): Array<Record<string, unknown>> {
-	if (Array.isArray(value)) {
-		return value.map((item) => ({ ...(asRecord(item) ?? {}) }));
-	}
-	const obj = asRecord(value);
-	if (obj) {
-		return Object.entries(obj).map(([k, v]) => ({ [k]: v }));
-	}
-	if (typeof value === 'string' && value.trim()) {
-		return [{ [value.trim()]: '' }];
-	}
-	return [];
-}
-
-function normalizeManifestStringList(value: unknown): string[] {
-	if (Array.isArray(value)) {
-		return value.map((item) => String(item));
-	}
-	if (typeof value === 'string' && value.trim()) {
-		return [value.trim()];
-	}
-	return [];
-}
-
-function readModuleManifestRoot(filePath: string): Record<string, unknown> | undefined {
-	if (!fs.existsSync(filePath)) {
-		return undefined;
-	}
-	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-	const match = content.match(/\/\*\s*=== MODULE MANIFEST(?: V2)? ===\s*([\s\S]*?)\s*=== END MANIFEST ===\s*\*\//i);
-	if (!match) {
-		return undefined;
-	}
-	try {
-		const parsed = parseYaml(match[1]);
-		const root = asRecord(parsed);
-		if (!root) {
-			return undefined;
-		}
-		root.constructor_args = normalizeManifestKeyValueList(root.constructor_args);
-		root.template_args = normalizeManifestKeyValueList(root.template_args);
-		root.required_hardware = normalizeManifestStringList(root.required_hardware);
-		root.depends = normalizeManifestStringList(root.depends);
-		return root;
-	} catch {
-		return undefined;
-	}
-}
-
-function writeModuleManifestRoot(filePath: string, root: Record<string, unknown>): boolean {
-	if (!fs.existsSync(filePath)) {
-		return false;
-	}
-	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-	const pattern = /(\/\*\s*=== MODULE MANIFEST(?: V2)? ===\s*)([\s\S]*?)(\s*=== END MANIFEST ===\s*\*\/)/i;
-	const eol = content.includes('\r\n') ? '\r\n' : '\n';
-	if (!pattern.test(content)) {
-		return false;
-	}
-	const manifestBody = stringifyYaml(root).trimEnd().replace(/\n/g, eol);
-	const updated = content.replace(pattern, `$1${manifestBody}${eol}$3`);
-	fs.writeFileSync(filePath, updated, 'utf8');
-	return true;
-}
-
-function readEditableRoot(filePath: string): Record<string, unknown> | undefined {
-	if (/\.(hpp|h)$/i.test(filePath)) {
-		return readModuleManifestRoot(filePath);
-	}
-	return readYamlRoot(filePath);
-}
-
-function writeEditableRoot(filePath: string, root: Record<string, unknown>): boolean {
-	if (/\.(hpp|h)$/i.test(filePath)) {
-		return writeModuleManifestRoot(filePath, root);
-	}
-	writeYamlRoot(filePath, root);
-	return true;
-}
-
-function buildModuleManifestNodes(manifestRoot: Record<string, unknown>, filePath: string): TreeNode[] {
-	const nodes: TreeNode[] = [];
-	if (Object.prototype.hasOwnProperty.call(manifestRoot, 'module_description')) {
-		nodes.push(yamlNode('module_description', manifestRoot.module_description, 0, filePath, ['module_description'], true));
-	} else {
-		nodes.push(messageNode('(missing) module_description'));
-	}
-	nodes.push(
-		groupNode(
-			'constructor_args',
-			buildManifestKeyValueSectionNodes(filePath, 'constructor_args', manifestRoot.constructor_args, 'constructor arg'),
-			true,
-		),
-	);
-	nodes.push(
-		groupNode(
-			'template_args',
-			buildManifestKeyValueSectionNodes(filePath, 'template_args', manifestRoot.template_args, 'template arg'),
-			true,
-		),
-	);
-	nodes.push(
-		groupNode(
-			'required_hardware',
-			buildManifestStringSectionNodes(filePath, 'required_hardware', manifestRoot.required_hardware, 'hardware'),
-			true,
-		),
-	);
-	nodes.push(
-		groupNode(
-			'depends',
-			buildManifestStringSectionNodes(filePath, 'depends', manifestRoot.depends, 'dependency'),
-			true,
-		),
-	);
-	for (const [key, value] of Object.entries(manifestRoot)) {
-		if (['module_description', 'constructor_args', 'template_args', 'required_hardware', 'depends'].includes(key)) {
-			continue;
-		}
-		nodes.push(yamlNode(key, value, 0, filePath, [key], true));
-	}
-	return nodes;
-}
-
-function buildManifestKeyValueSectionNodes(
-	filePath: string,
-	section: string,
-	value: unknown,
-	itemLabel: string,
-): TreeNode[] {
-	const items = normalizeManifestKeyValueList(value);
-	const nodes: TreeNode[] = [opNode(`add ${itemLabel}`, 'xrobot.addModuleManifestKeyValue', [filePath, section], undefined, 'add')];
-	if (items.length === 0) {
-		nodes.push(messageNode('(empty)'));
-		return nodes;
-	}
-	items.forEach((entry, index) => {
-		const obj = asRecord(entry);
-		if (obj && Object.keys(obj).length === 1) {
-			const [key, itemValue] = Object.entries(obj)[0];
-			nodes.push(
-				groupNode(
-					key,
-					[
-						yamlNode('value', itemValue, 0, filePath, [section, index, key], true),
-						opNode('rename key', 'xrobot.renameModuleManifestKey', [filePath, section, index], undefined, 'edit'),
-						opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
-					],
-					false,
-				),
-			);
-			return;
-		}
-		nodes.push(
-			groupNode(
-				`${itemLabel} #${index}`,
-				[
-					...toYamlValueNodes(entry, 0, filePath, [section, index], true),
-					opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
-				],
-				false,
-			),
-		);
-	});
-	return nodes;
-}
-
-function buildManifestStringSectionNodes(
-	filePath: string,
-	section: string,
-	value: unknown,
-	itemLabel: string,
-): TreeNode[] {
-	const items = normalizeManifestStringList(value);
-	const nodes: TreeNode[] = [opNode(`add ${itemLabel}`, 'xrobot.addModuleManifestString', [filePath, section], undefined, 'add')];
-	if (items.length === 0) {
-		nodes.push(messageNode('(empty)'));
-		return nodes;
-	}
-	items.forEach((item, index) => {
-		nodes.push(
-			groupNode(
-				item,
-				[
-					yamlNode('value', item, 0, filePath, [section, index], true),
-					opNode('delete', 'xrobot.deleteModuleManifestEntry', [filePath, section, index], undefined, 'trash'),
-				],
-				false,
-			),
-		);
-	});
-	return nodes;
-}
-
 export async function editYamlScalar(filePath: string, keyPath: Array<string | number>): Promise<void> {
-	const rootObj = readEditableRoot(filePath);
-	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
+	// Edit through the YAML document model so comments and layout of the rest survive.
+	let doc: ReturnType<typeof parseDocument>;
+	try {
+		doc = parseDocument(fs.readFileSync(filePath, 'utf8'));
+	} catch (error) {
+		vscode.window.showErrorMessage(`Cannot load YAML: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
 		return;
 	}
-	const current = getAtPath(rootObj, keyPath);
-	if (current !== null && typeof current === 'object') {
+	if (doc.errors.length > 0) {
+		vscode.window.showErrorMessage(`Cannot edit ${filePath}: ${doc.errors[0].message}`);
+		return;
+	}
+	const current = doc.getIn(keyPath);
+	if (isCollection(current)) {
 		vscode.window.showInformationMessage('Only scalar values are editable.');
 		return;
 	}
 	const input = await vscode.window.showInputBox({
 		prompt: `Edit ${keyPath.join('.')}`,
-		value: current === undefined ? '' : String(current),
+		value: current === undefined || current === null ? '' : String(current),
 	});
 	if (input === undefined) {
 		return;
 	}
-	setAtPath(rootObj, keyPath, parseScalarInput(input));
-	if (!writeEditableRoot(filePath, rootObj)) {
-		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
+	doc.setIn(keyPath, parseScalarInput(input));
+	try {
+		fs.writeFileSync(filePath, doc.toString(), 'utf8');
+	} catch (error) {
+		vscode.window.showErrorMessage(`Failed to write ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
 		return;
 	}
 	if (normalizePath(filePath) === normalizePath(libxrConfigPath())) {
@@ -1588,111 +1535,6 @@ export async function editYamlScalar(filePath: string, keyPath: Array<string | n
 	}
 	if (normalizePath(filePath) === normalizePath(xrobotConfigPath())) {
 		await runXrobotGenerateMainFromCurrent();
-	}
-}
-
-export async function addModuleManifestKeyValue(filePath: string, section: string): Promise<void> {
-	const rootObj = readEditableRoot(filePath);
-	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
-		return;
-	}
-	const key = await vscode.window.showInputBox({
-		prompt: `New key for ${section}`,
-		placeHolder: section === 'constructor_args' ? 'blink_cycle' : 'ChassisType',
-	});
-	if (!key || !key.trim()) {
-		return;
-	}
-	const valueInput = await vscode.window.showInputBox({
-		prompt: `Default value for ${key.trim()}`,
-		value: '',
-	});
-	if (valueInput === undefined) {
-		return;
-	}
-	const items = normalizeManifestKeyValueList(rootObj[section]);
-	items.push({ [key.trim()]: parseScalarInput(valueInput) });
-	rootObj[section] = items;
-	if (!writeEditableRoot(filePath, rootObj)) {
-		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
-	}
-}
-
-export async function addModuleManifestString(filePath: string, section: string): Promise<void> {
-	const rootObj = readEditableRoot(filePath);
-	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
-		return;
-	}
-	const nextValue = await vscode.window.showInputBox({
-		prompt: `New value for ${section}`,
-		value: '',
-	});
-	if (!nextValue || !nextValue.trim()) {
-		return;
-	}
-	const items = normalizeManifestStringList(rootObj[section]);
-	items.push(nextValue.trim());
-	rootObj[section] = items;
-	if (!writeEditableRoot(filePath, rootObj)) {
-		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
-	}
-}
-
-export async function deleteModuleManifestEntry(filePath: string, section: string, index: number): Promise<void> {
-	const rootObj = readEditableRoot(filePath);
-	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
-		return;
-	}
-	if (section === 'constructor_args' || section === 'template_args') {
-		const items = normalizeManifestKeyValueList(rootObj[section]);
-		if (index < 0 || index >= items.length) {
-			return;
-		}
-		items.splice(index, 1);
-		rootObj[section] = items;
-	} else {
-		const items = normalizeManifestStringList(rootObj[section]);
-		if (index < 0 || index >= items.length) {
-			return;
-		}
-		items.splice(index, 1);
-		rootObj[section] = items;
-	}
-	if (!writeEditableRoot(filePath, rootObj)) {
-		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
-	}
-}
-
-export async function renameModuleManifestKey(filePath: string, section: string, index: number): Promise<void> {
-	const rootObj = readEditableRoot(filePath);
-	if (!rootObj) {
-		vscode.window.showErrorMessage(`Cannot load editable data: ${filePath}`);
-		return;
-	}
-	const items = normalizeManifestKeyValueList(rootObj[section]);
-	if (index < 0 || index >= items.length) {
-		return;
-	}
-	const obj = asRecord(items[index]);
-	if (!obj || Object.keys(obj).length !== 1) {
-		vscode.window.showInformationMessage('Only single-key manifest entries can be renamed.');
-		return;
-	}
-	const [currentKey, currentValue] = Object.entries(obj)[0];
-	const nextKey = await vscode.window.showInputBox({
-		prompt: `Rename key in ${section}`,
-		value: currentKey,
-	});
-	if (!nextKey || !nextKey.trim() || nextKey.trim() === currentKey) {
-		return;
-	}
-	items[index] = { [nextKey.trim()]: currentValue };
-	rootObj[section] = items;
-	if (!writeEditableRoot(filePath, rootObj)) {
-		vscode.window.showErrorMessage(`Failed to write editable data: ${filePath}`);
 	}
 }
 
@@ -1917,180 +1759,171 @@ export async function deleteSource(index: number): Promise<void> {
 	writeYamlRoot(sourcesYamlPath(), root);
 }
 
-type HardwareAliasEditState = {
-	root: Record<string, unknown>;
-	entry: Record<string, unknown>;
-	aliases: string[];
+type XrobotEditState = {
+	ctx: WorkspaceContext;
+	paths: XrobotPaths;
+	describe: DescribeResult;
 };
 
-function getHardwareAliasEditState(entryKey: string): HardwareAliasEditState | undefined {
-	const root = ensureLibxrRootWithDeviceAliases();
-	if (!root) {
+async function loadXrobotEditState(): Promise<XrobotEditState | undefined> {
+	const ctx = getWorkspaceContext();
+	if (!ctx) {
+		vscode.window.showInformationMessage('Please open a workspace folder first.');
 		return undefined;
 	}
-	const entry = asRecord((root.device_aliases as Record<string, unknown>)[entryKey]);
-	if (!entry) {
+	if (!ctx.hasXrobotConfig) {
+		vscode.window.showInformationMessage(`No usable XRobot config (${ctx.xrobotConfigRel}); run xrobot_setup first.`);
 		return undefined;
 	}
-	const aliases = Array.isArray(entry.aliases) ? entry.aliases.map((a) => String(a)) : [];
-	return { root, entry, aliases };
-}
-
-function hardwareAliasOperation(action: 'add' | 'edit' | 'delete', entryKey: string, aliasIndex?: number): string {
-	if (aliasIndex === undefined) {
-		return `${action}HardwareAlias(${entryKey})`;
+	const paths = xrobotPathsFor(ctx);
+	const outcome = await vscode.window.withProgress(
+		{ location: vscode.ProgressLocation.Window, title: 'XRobot: reading project (xrobot_describe)' },
+		() => awaitXrobotDescribe(paths),
+	);
+	if (!outcome.ok) {
+		vscode.window.showErrorMessage(`xrobot_describe failed: ${outcome.error}`);
+		return undefined;
 	}
-	return `${action}HardwareAlias(${entryKey},${aliasIndex})`;
+	return { ctx, paths, describe: outcome.value };
 }
 
-async function persistHardwareAliasEdit(
-	state: HardwareAliasEditState,
-	entryKey: string,
-	action: 'add' | 'edit' | 'delete',
-	aliasIndex?: number,
-): Promise<boolean> {
-	state.entry.aliases = state.aliases;
-	const op = hardwareAliasOperation(action, entryKey, aliasIndex);
-	const detail = aliasIndex === undefined ? `entry=${entryKey} aliases=${state.aliases.length}` : `entry=${entryKey} index=${aliasIndex} aliases=${state.aliases.length}`;
-	outputChannel.appendLine(`[libxr] ${action}HardwareAlias ${detail}`);
-	if (!writeLibxrConfigWithValidation(state.root, op)) {
+async function pickInstance(describe: DescribeResult, placeHolder: string): Promise<DescribeInstance | undefined> {
+	if (describe.instances.length === 0) {
+		vscode.window.showInformationMessage(`No instances in ${describe.config}.`);
+		return undefined;
+	}
+	const picked = await vscode.window.showQuickPick(
+		describe.instances.map((instance) => ({
+			label: instance.id,
+			description: instance.module,
+			instance,
+		})),
+		{ placeHolder, matchOnDescription: true },
+	);
+	return picked?.instance;
+}
+
+// Instance edits always go through xrobot_instance (it validates and keeps YAML
+// comments); the entry header is regenerated only after a successful write.
+async function runXrobotInstance(paths: XrobotPaths, label: string, args: string[]): Promise<boolean> {
+	const code = await runCli({ label, cmd: 'xrobot_instance', args });
+	if (code !== 0) {
+		void vscode.window.showErrorMessage(`${label} failed${code === undefined ? '' : ` (exit ${code})`}; see "XRobot" output.`);
 		return false;
 	}
-	await runLibxrGenerateCodeFromCurrent();
+	await runXrobotGenerateMain(paths);
 	return true;
 }
 
-export async function addHardwareAlias(entryKey: string): Promise<void> {
-	const state = getHardwareAliasEditState(entryKey);
-	if (!state) {
-		return;
-	}
-	const next = await vscode.window.showInputBox({ prompt: `Add alias to ${entryKey}` });
-	if (!next || !next.trim()) {
-		return;
-	}
-	state.aliases.push(next.trim());
-	await persistHardwareAliasEdit(state, entryKey, 'add');
-}
-
-export async function editHardwareAlias(entryKey: string, aliasIndex: number): Promise<void> {
-	const state = getHardwareAliasEditState(entryKey);
-	if (!state) {
-		return;
-	}
-	if (aliasIndex < 0 || aliasIndex >= state.aliases.length) {
-		return;
-	}
-	const next = await vscode.window.showInputBox({ prompt: `Edit alias of ${entryKey}`, value: state.aliases[aliasIndex] });
-	if (!next || !next.trim()) {
-		return;
-	}
-	state.aliases[aliasIndex] = next.trim();
-	await persistHardwareAliasEdit(state, entryKey, 'edit', aliasIndex);
-}
-
-export async function deleteHardwareAlias(entryKey: string, aliasIndex: number): Promise<void> {
-	const state = getHardwareAliasEditState(entryKey);
-	if (!state) {
-		return;
-	}
-	if (state.aliases.length <= 1) {
-		vscode.window.showInformationMessage('At least one alias must remain.');
-		return;
-	}
-	if (aliasIndex < 0 || aliasIndex >= state.aliases.length) {
-		return;
-	}
-	state.aliases.splice(aliasIndex, 1);
-	await persistHardwareAliasEdit(state, entryKey, 'delete', aliasIndex);
-}
-
 export async function addModuleInstance(): Promise<void> {
-	const candidates = listLocalModuleCandidates();
+	const state = await loadXrobotEditState();
+	if (!state) {
+		return;
+	}
+	const { describe, paths } = state;
+	const modules = Object.values(describe.modules)
+		.filter((m) => m.standalone)
+		.sort((a, b) => a.id.localeCompare(b.id));
+	if (modules.length === 0) {
+		vscode.window.showInformationMessage('No instantiable Modules in the locked sources; add a repo and run xrobot_setup.');
+		return;
+	}
 	const picked = await vscode.window.showQuickPick(
-		[
-			...candidates.map((m) => ({ label: m })),
-			{ label: '$(edit) Manual input...', description: 'Type module name manually' },
-		],
-		{
-			placeHolder: 'Select module instance target (local modules first)',
-		},
+		modules.map((m) => ({
+			label: m.id,
+			description: m.class,
+			detail: m.error ? `interface error: ${m.error}` : undefined,
+			module: m,
+		})),
+		{ placeHolder: 'Select the Module to instantiate', matchOnDescription: true },
 	);
 	if (!picked) {
 		return;
 	}
-	let target = picked.label;
-	if (picked.label.includes('Manual input')) {
-		const manual = await vscode.window.showInputBox({
-			prompt: 'Module name to instantiate',
-			placeHolder: 'BlinkLED',
-		});
-		if (!manual || !manual.trim()) {
+	const taken = new Set(describe.instances.map((i) => i.id));
+	const id = await vscode.window.showInputBox({
+		prompt: `Instance id for ${picked.module.id} (optional; empty = automatic ${picked.module.class.toLowerCase()}_<n>)`,
+		validateInput: (value) => {
+			const trimmed = value.trim();
+			if (!trimmed) {
+				return undefined;
+			}
+			if (!isCppIdentifier(trimmed)) {
+				return 'Instance id must be a C++ identifier';
+			}
+			return taken.has(trimmed) ? `Instance id ${trimmed} already exists` : undefined;
+		},
+	});
+	if (id === undefined) {
+		return;
+	}
+	await runXrobotInstance(paths, 'xrobot_instance add', buildInstanceAddArgs(paths.config, picked.module.id, id));
+}
+
+export async function editModuleInstance(instanceId?: string, target?: InstanceEditTarget): Promise<void> {
+	const state = await loadXrobotEditState();
+	if (!state) {
+		return;
+	}
+	const { describe, paths } = state;
+	const instance =
+		(instanceId ? describe.instances.find((i) => i.id === instanceId) : undefined) ??
+		(await pickInstance(describe, 'Select the instance to edit'));
+	if (!instance) {
+		return;
+	}
+	const values = await editInstanceInteractively(describe, instance, target);
+	if (!values) {
+		return;
+	}
+	await runXrobotInstance(paths, 'xrobot_instance set', buildInstanceSetArgs(paths.config, instance.id, values));
+}
+
+export async function deleteModuleInstance(instanceId?: string): Promise<void> {
+	let id = instanceId;
+	let paths: XrobotPaths | undefined;
+	if (!id) {
+		const state = await loadXrobotEditState();
+		if (!state) {
 			return;
 		}
-		target = manual.trim();
+		paths = state.paths;
+		id = (await pickInstance(state.describe, 'Select the instance to delete'))?.id;
+	} else {
+		const ctx = getWorkspaceContext();
+		paths = ctx ? xrobotPathsFor(ctx) : undefined;
 	}
-	if (!target || !target.trim()) {
+	if (!id || !paths) {
 		return;
 	}
-	await runCli({
-		label: 'xrobot_add_mod',
-		cmd: 'xrobot_add_mod',
-		args: [target.trim(), '--config', getWorkspaceRelativeConfig('xrobot.xrobot.configPath', 'User/xrobot.yaml')],
-	});
-	await runXrobotGenerateMainFromCurrent();
+	const confirmed = await vscode.window.showWarningMessage(
+		`Remove instance ${id} from ${paths.config}?`,
+		{ modal: true },
+		'Remove',
+	);
+	if (confirmed !== 'Remove') {
+		return;
+	}
+	await runXrobotInstance(paths, 'xrobot_instance remove', buildInstanceRemoveArgs(paths.config, id));
 }
 
-export async function editModuleInstance(index: number): Promise<void> {
-	const configPath = xrobotConfigPath();
-	const root = ensureRootWithArray(configPath, 'modules');
+// Fallback listing when xrobot_describe is unavailable: display only, never edited.
+function readYamlInstances(configPath: string): DescribeInstance[] | undefined {
+	const root = readYamlRoot(configPath);
 	if (!root) {
-		return;
+		return undefined;
 	}
-	const modules = root.modules as unknown[];
-	if (index < 0 || index >= modules.length) {
-		return;
-	}
-	const instance = asRecord(modules[index]);
-	if (!instance) {
-		vscode.window.showInformationMessage('Only object instances are editable.');
-		return;
-	}
-	const nextId = await vscode.window.showInputBox({
-		prompt: 'Instance id',
-		value: instance.id === undefined ? '' : String(instance.id),
+	const modules = Array.isArray(root.modules) ? root.modules : [];
+	return modules.map((entry, index) => {
+		const item = asRecord(entry) ?? {};
+		return {
+			id: item.id !== undefined ? String(item.id) : `#${index}`,
+			module: item.module !== undefined ? String(item.module) : '(no module)',
+			class: null,
+			template_args: Array.isArray(item.template_args) ? (item.template_args as ValueTree[]) : [],
+			args: Array.isArray(item.args) ? (item.args as NamedValue[]) : [],
+		};
 	});
-	if (nextId === undefined) {
-		return;
-	}
-	const nextName = await vscode.window.showInputBox({
-		prompt: 'Module name',
-		value: instance.name === undefined ? '' : String(instance.name),
-	});
-	if (nextName === undefined) {
-		return;
-	}
-	instance.id = nextId.trim() || instance.id;
-	instance.name = nextName.trim() || instance.name;
-	// Fallback to direct YAML write because xrobot CLI currently has no "edit instance" command.
-	writeYamlRoot(configPath, root);
-	await runXrobotGenerateMainFromCurrent();
-}
-
-export async function deleteModuleInstance(index: number): Promise<void> {
-	const configPath = xrobotConfigPath();
-	const root = ensureRootWithArray(configPath, 'modules');
-	if (!root) {
-		return;
-	}
-	const modules = root.modules as unknown[];
-	if (index < 0 || index >= modules.length) {
-		return;
-	}
-	// Fallback to direct YAML write because xrobot CLI currently has no "delete instance" command.
-	modules.splice(index, 1);
-	writeYamlRoot(configPath, root);
-	await runXrobotGenerateMainFromCurrent();
 }
 
 export async function createModuleWizard(): Promise<void> {
@@ -2102,19 +1935,17 @@ export async function createModuleWizard(): Promise<void> {
 	if (desc === undefined) {
 		return;
 	}
-	const hw = await vscode.window.showInputBox({ prompt: 'Hardware tags (space-separated, optional)', value: '' });
-	if (hw === undefined) {
-		return;
-	}
 	const ctor = await vscode.window.showInputBox({
-		prompt: 'Constructor args (space-separated k=v, optional)',
+		prompt: 'Constructor parameter declarations (C++, separated by ";", optional)',
+		placeHolder: 'LibXR::GPIO& led; uint32_t blink_cycle = 250',
 		value: '',
 	});
 	if (ctor === undefined) {
 		return;
 	}
 	const template = await vscode.window.showInputBox({
-		prompt: 'Template args (space-separated k=v, optional)',
+		prompt: 'Template parameter declarations (C++, separated by ";", optional)',
+		placeHolder: 'typename ChassisType',
 		value: '',
 	});
 	if (template === undefined) {
@@ -2135,18 +1966,20 @@ export async function createModuleWizard(): Promise<void> {
 		return;
 	}
 
+	const splitDeclarations = (text: string): string[] =>
+		text
+			.split(';')
+			.map((item) => item.trim())
+			.filter((item) => item.length > 0);
 	const args: string[] = [className.trim()];
 	if (desc.trim()) {
 		args.push('--desc', desc.trim());
 	}
-	if (hw.trim()) {
-		args.push('--hw', ...hw.trim().split(/\s+/));
+	for (const decl of splitDeclarations(ctor)) {
+		args.push('--constructor', decl);
 	}
-	if (ctor.trim()) {
-		args.push('--constructor', ...ctor.trim().split(/\s+/));
-	}
-	if (template.trim()) {
-		args.push('--template', ...template.trim().split(/\s+/));
+	for (const decl of splitDeclarations(template)) {
+		args.push('--template', decl);
 	}
 	if (depends.trim()) {
 		args.push('--depends', ...depends.trim().split(/\s+/));
@@ -2334,12 +2167,30 @@ function normalizePath(p: string): string {
 	return path.resolve(p).toLowerCase();
 }
 
-async function runXrobotGenerateMainFromCurrent(): Promise<void> {
+export function xrobotPathsFor(ctx: WorkspaceContext): XrobotPaths {
+	return {
+		root: ctx.root,
+		config: ctx.xrobotConfigRel,
+		registerSource: fs.existsSync(ctx.appMainAbs) ? ctx.appMainRel : undefined,
+		header: XROBOT_ENTRY_HEADER,
+		lock: XROBOT_LOCK_FILE,
+	};
+}
+
+async function runXrobotGenerateMain(paths: XrobotPaths): Promise<void> {
 	await runCli({
 		label: 'xrobot_gen_main',
 		cmd: 'xrobot_gen_main',
-		args: ['--output', 'User/xrobot_main.hpp', '--config', getWorkspaceRelativeConfig('xrobot.xrobot.configPath', 'User/xrobot.yaml')],
+		args: buildGenMainArgs(paths),
 	});
+}
+
+async function runXrobotGenerateMainFromCurrent(): Promise<void> {
+	const ctx = getWorkspaceContext();
+	if (!ctx) {
+		return;
+	}
+	await runXrobotGenerateMain(xrobotPathsFor(ctx));
 }
 
 async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
@@ -2392,32 +2243,6 @@ async function listModuleCandidatesFromSources(): Promise<string[]> {
 	return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-function listLocalModuleCandidates(): string[] {
-	const root = getWorkspaceRoot();
-	if (!root) {
-		return [];
-	}
-	const modulesDir = path.join(root, 'Modules');
-	const result = new Set<string>();
-	if (fs.existsSync(modulesDir)) {
-		for (const entry of fs.readdirSync(modulesDir, { withFileTypes: true })) {
-			if (!entry.isDirectory()) {
-				continue;
-			}
-			if (entry.name.startsWith('.')) {
-				continue;
-			}
-			const modName = entry.name;
-			const hppPath = path.join(modulesDir, modName, `${modName}.hpp`);
-			const altHppPath = path.join(modulesDir, modName, `${modName}.h`);
-			if (fs.existsSync(hppPath) || fs.existsSync(altHppPath) || fs.existsSync(path.join(modulesDir, modName, 'CMakeLists.txt'))) {
-				result.add(modName);
-			}
-		}
-	}
-	return Array.from(result).sort((a, b) => a.localeCompare(b));
-}
-
 export function readYamlRoot(filePath: string): Record<string, unknown> | undefined {
 	if (!fs.existsSync(filePath)) {
 		return undefined;
@@ -2441,46 +2266,6 @@ export function ensureRootWithArray(filePath: string, key: string): Record<strin
 	return root;
 }
 
-function ensureLibxrRootWithDeviceAliases(): Record<string, unknown> | undefined {
-	const filePath = libxrConfigPath();
-	const root = readYamlRoot(filePath);
-	if (!root) {
-		vscode.window.showErrorMessage(`Cannot load libxr config: ${filePath}`);
-		return undefined;
-	}
-	const aliases = asRecord(root.device_aliases);
-	if (!aliases) {
-		vscode.window.showErrorMessage('device_aliases not found in libxr config.');
-		return undefined;
-	}
-	root.device_aliases = aliases;
-	return root;
-}
-
-function writeLibxrConfigWithValidation(root: Record<string, unknown>, operation: string): boolean {
-	const filePath = libxrConfigPath();
-	const result = guardedWriteYamlRoot(filePath, root, (parsedRoot) => Boolean(asRecord(parsedRoot.device_aliases)));
-	if (result.ok) {
-		return true;
-	}
-	if (result.stage === 'read') {
-		vscode.window.showErrorMessage(`Cannot read libxr config before ${operation}: ${filePath}`);
-		outputChannel.appendLine(`[libxr] ${operation}: read failed: ${result.error}`);
-		return false;
-	}
-	if (result.stage === 'write') {
-		vscode.window.showErrorMessage(`Failed to write libxr config during ${operation}.`);
-		outputChannel.appendLine(`[libxr] ${operation}: write failed: ${result.error}`);
-		return false;
-	}
-	vscode.window.showErrorMessage('LibXR config validation failed after alias edit; restored previous file.');
-	outputChannel.appendLine(`[libxr] ${operation}: post-write validation failed: ${result.error}`);
-	if (result.rollbackError) {
-		outputChannel.appendLine(`[libxr] ${operation}: rollback failed: ${result.rollbackError}`);
-	}
-	return false;
-}
-
 export function getSourceObject(items: unknown[], index: number): Record<string, unknown> | undefined {
 	if (index < 0 || index >= items.length) {
 		return undefined;
@@ -2490,58 +2275,6 @@ export function getSourceObject(items: unknown[], index: number): Record<string,
 		return undefined;
 	}
 	return obj;
-}
-
-export function getAtPath(root: unknown, keyPath: Array<string | number>): unknown {
-	let current: unknown = root;
-	for (const key of keyPath) {
-		if (typeof key === 'number') {
-			if (!Array.isArray(current)) {
-				return undefined;
-			}
-			current = current[key];
-		} else {
-			const record = asRecord(current);
-			if (!record) {
-				return undefined;
-			}
-			current = record[key];
-		}
-	}
-	return current;
-}
-
-export function setAtPath(root: unknown, keyPath: Array<string | number>, value: unknown): void {
-	if (keyPath.length === 0) {
-		return;
-	}
-	let current: unknown = root;
-	for (let i = 0; i < keyPath.length - 1; i += 1) {
-		const key = keyPath[i];
-		if (typeof key === 'number') {
-			if (!Array.isArray(current)) {
-				return;
-			}
-			current = current[key];
-		} else {
-			const record = asRecord(current);
-			if (!record) {
-				return;
-			}
-			current = record[key];
-		}
-	}
-	const last = keyPath[keyPath.length - 1];
-	if (typeof last === 'number') {
-		if (Array.isArray(current)) {
-			current[last] = value;
-		}
-	} else {
-		const record = asRecord(current);
-		if (record) {
-			record[last] = value;
-		}
-	}
 }
 
 export function parseScalarInput(input: string): unknown {
@@ -2690,12 +2423,13 @@ function hasPipPackage(pythonCmd: string, pkg: string): boolean {
 	return result.status === 0 && /Name:\s*/i.test(result.stdout ?? '');
 }
 
-export async function runCli(request: CliRunRequest): Promise<void> {
+export async function runCli(request: CliRunRequest): Promise<number | undefined> {
 	// Centralized CLI runner used by all actions and post-edit auto-generation hooks.
+	// Resolves with the exit code once the process has finished (undefined if it never ran).
 	const root = getWorkspaceRoot();
 	if (!root) {
 		vscode.window.showErrorMessage('Please open a workspace folder first.');
-		return;
+		return undefined;
 	}
 
 	const args = [...(request.args ?? [])];
@@ -2705,42 +2439,206 @@ export async function runCli(request: CliRunRequest): Promise<void> {
 			value: request.defaultInput ?? '',
 		});
 		if (userInput === undefined) {
-			return;
+			return undefined;
 		}
 		if (userInput.trim()) {
 			args.push(...userInput.trim().split(/\s+/));
 		}
 	}
 
-	outputChannel.appendLine(`$ ${request.cmd}${args.length > 0 ? ` ${args.join(' ')}` : ''}`);
+	outputChannel.appendLine(`$ ${formatCommandLine(request.cmd, args)}`);
 	outputChannel.appendLine(`cwd: ${root}`);
 	outputChannel.appendLine('----');
 	outputChannel.show(true);
 
-	const child = spawn(request.cmd, args, {
-		cwd: root,
-		shell: true,
-		env: getCliEnv(),
-	});
+	const result = await startCli(request.cmd, args, root, {
+		onStdout: (text) => outputChannel.append(text),
+		onStderr: (text) => outputChannel.append(text),
+	}).done;
 
-	child.stdout.on('data', (data: Buffer | string) => outputChannel.append(data.toString()));
-	child.stderr.on('data', (data: Buffer | string) => outputChannel.append(data.toString()));
-
-	child.on('error', (error: NodeJS.ErrnoException) => {
-		if (error.code === 'ENOENT') {
+	if (result.error) {
+		if (result.error.code === 'ENOENT') {
 			void vscode.window.showErrorMessage(
 				'命令未在 PATH 中，检查 pipx ensurepath 或设置 xrobot.cli.extraPath',
 			);
 		} else {
-			void vscode.window.showErrorMessage(`Run failed: ${error.message}`);
+			void vscode.window.showErrorMessage(`Run failed: ${result.error.message}`);
 		}
-		outputChannel.appendLine(`\n[error] ${error.message}`);
-	});
-
-	child.on('close', (code: number | null) => {
-		outputChannel.appendLine(`\n[exit] ${code ?? -1}`);
+		outputChannel.appendLine(`\n[error] ${result.error.message}`);
 		outputChannel.appendLine('');
-	});
+		return undefined;
+	}
+	outputChannel.appendLine(`\n[exit] ${result.code ?? -1}`);
+	outputChannel.appendLine('');
+	return result.code ?? undefined;
+}
+
+type CliResult = {
+	code: number | null;
+	stdout: string;
+	stderr: string;
+	error?: NodeJS.ErrnoException;
+	cancelled: boolean;
+};
+
+type CliRun = {
+	done: Promise<CliResult>;
+	cancel: () => void;
+};
+
+// Python entry points of the xrobot CLIs, used only when the console script is not
+// on PATH but a Python interpreter (xrobot.cli.pythonPath or auto-detected) is.
+const XROBOT_PYTHON_ENTRY_POINTS: Record<string, [string, string]> = {
+	xrobot_describe: ['xrobot.Describe', 'main'],
+	xrobot_instance: ['xrobot.AddModule', 'instance_main'],
+	xrobot_gen_main: ['xrobot.GenerateMain', 'main'],
+	xrobot_setup: ['xrobot.XRobotSetup', 'main'],
+};
+
+// Spawns without a shell: each argument (JSON, C++ text, paths with spaces) reaches the
+// tool as one argv element. Commands are looked up on PATH (+ xrobot.cli.extraPath).
+function startCli(
+	cmd: string,
+	args: string[],
+	cwd: string,
+	handlers?: { onStdout?: (text: string) => void; onStderr?: (text: string) => void },
+): CliRun {
+	let cancelled = false;
+	let current: ReturnType<typeof spawn> | undefined;
+
+	const attempt = (command: string, argv: string[]): Promise<CliResult> =>
+		new Promise((resolve) => {
+			let stdout = '';
+			let stderr = '';
+			let settled = false;
+			const settle = (result: CliResult): void => {
+				if (!settled) {
+					settled = true;
+					resolve(result);
+				}
+			};
+			const child = spawn(command, argv, { cwd, shell: false, env: getCliEnv() });
+			current = child;
+			child.stdout?.on('data', (d: Buffer | string) => {
+				const text = d.toString();
+				stdout += text;
+				handlers?.onStdout?.(text);
+			});
+			child.stderr?.on('data', (d: Buffer | string) => {
+				const text = d.toString();
+				stderr += text;
+				handlers?.onStderr?.(text);
+			});
+			child.on('error', (error: NodeJS.ErrnoException) => settle({ code: null, stdout, stderr, error, cancelled }));
+			child.on('close', (code: number | null) => settle({ code, stdout, stderr, cancelled }));
+		});
+
+	const done = (async (): Promise<CliResult> => {
+		const first = await attempt(cmd, args);
+		const entry = XROBOT_PYTHON_ENTRY_POINTS[cmd];
+		if (first.error?.code !== 'ENOENT' || !entry || cancelled) {
+			return first;
+		}
+		const python = detectPythonCommand();
+		if (!python) {
+			return first;
+		}
+		const [moduleName, functionName] = entry;
+		const bootstrap = `import sys; sys.argv[0] = ${JSON.stringify(cmd)}; from ${moduleName} import ${functionName} as entry; sys.exit(entry())`;
+		handlers?.onStderr?.(`[info] ${cmd} not found in PATH; running ${moduleName}:${functionName} with ${python}\n`);
+		const second = await attempt(python, ['-c', bootstrap, ...args]);
+		return second.error?.code === 'ENOENT' ? first : second;
+	})();
+
+	return {
+		done,
+		cancel: () => {
+			cancelled = true;
+			current?.kill();
+		},
+	};
+}
+
+type DescribeOutcome =
+	| { ok: true; value: DescribeResult }
+	| { ok: false; error: string; cancelled?: boolean };
+
+// One xrobot_describe run per refresh: the tree and the edit commands share the result
+// until the next refresh (after every edit and on watched file changes).
+class XrobotDescribeCache {
+	private key: string | undefined;
+	private pending: Promise<DescribeOutcome> | undefined;
+	private cancelRun: (() => void) | undefined;
+
+	invalidate(): void {
+		this.cancelRun?.();
+		this.key = undefined;
+		this.pending = undefined;
+		this.cancelRun = undefined;
+	}
+
+	get(paths: XrobotPaths): Promise<DescribeOutcome> {
+		const args = buildDescribeArgs(paths);
+		const key = args.join('\u0000');
+		if (this.pending && this.key === key) {
+			return this.pending;
+		}
+		this.invalidate();
+		const run = startCli('xrobot_describe', args, paths.root);
+		this.key = key;
+		this.cancelRun = run.cancel;
+		this.pending = run.done.then((result): DescribeOutcome => {
+			if (result.cancelled) {
+				return { ok: false, error: 'cancelled', cancelled: true };
+			}
+			const commandLine = formatCommandLine('xrobot_describe', args);
+			if (result.error) {
+				outputChannel.appendLine(`[describe] ${commandLine}: ${result.error.message}`);
+				return {
+					ok: false,
+					error: result.error.code === 'ENOENT' ? 'xrobot_describe not found in PATH' : result.error.message,
+				};
+			}
+			if (result.code !== 0) {
+				const detail = result.stderr.trim() || `exit ${result.code ?? -1}`;
+				outputChannel.appendLine(`[describe] ${commandLine} failed (exit ${result.code ?? -1}): ${detail}`);
+				return { ok: false, error: detail.split(/\r?\n/).pop() ?? detail };
+			}
+			const parsed = parseDescribeOutput(result.stdout);
+			if (!parsed.ok) {
+				outputChannel.appendLine(`[describe] ${commandLine}: ${parsed.error}`);
+			}
+			return parsed;
+		});
+		const pending = this.pending;
+		void vscode.window.withProgress({ location: { viewId: 'xrobot.xrobotView' } }, async () => {
+			await pending;
+		});
+		return pending;
+	}
+}
+
+const xrobotDescribeCache = new XrobotDescribeCache();
+
+export function invalidateXrobotDescribe(): void {
+	xrobotDescribeCache.invalidate();
+}
+
+// Resolves with the newest run: a run cancelled by a refresh hands over to a run for
+// the current workspace state (which may have switched config meanwhile).
+async function awaitXrobotDescribe(paths: XrobotPaths): Promise<DescribeOutcome> {
+	let current = paths;
+	for (;;) {
+		const outcome = await xrobotDescribeCache.get(current);
+		if (outcome.ok || !outcome.cancelled) {
+			return outcome;
+		}
+		const ctx = getWorkspaceContext();
+		if (!ctx || !ctx.hasXrobotConfig) {
+			return outcome;
+		}
+		current = xrobotPathsFor(ctx);
+	}
 }
 
 export function getCliEnv(): NodeJS.ProcessEnv {
@@ -2882,6 +2780,8 @@ export function registerWatchers(context: vscode.ExtensionContext, refreshAll: (
 		'User/libxr_config.yaml',
 		'app_main.cpp',
 		'User/app_main.cpp',
+		'User/xrobot_main.hpp',
+		'xrobot.lock',
 		'Modules/**/*.yml',
 		'Modules/**/*.yaml',
 		'User/**/*.yml',

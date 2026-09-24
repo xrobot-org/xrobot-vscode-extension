@@ -32,6 +32,16 @@ suite('hasUsableXrobotConfig', () => {
 		}
 	});
 
+	test('returns true when yaml only has settings', () => {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xrobot-ext-'));
+		try {
+			const configPath = writeFile(tmp, 'User/xrobot.yaml', 'settings:\n  monitor_sleep_ms: 1000\n');
+			assert.strictEqual(hasUsableXrobotConfig(configPath), true);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
 	test('returns false when yaml is unrelated', () => {
 		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xrobot-ext-'));
 		try {
