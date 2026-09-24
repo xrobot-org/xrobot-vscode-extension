@@ -52,7 +52,6 @@ function sampleDescribe(): DescribeResult {
 		entry: {
 			path: 'User/xrobot_main.hpp',
 			status: 'stale',
-			tool: 'xrobot 0.3.1',
 			inputs: [
 				{ kind: 'config', path: 'xrobot.yaml', recorded: 'a', current: 'b', status: 'stale' },
 				{ kind: 'lock', path: '../xrobot.lock', recorded: 'c', current: 'c', status: 'fresh' },

@@ -37,7 +37,6 @@ export type DescribeEntryInput = {
 export type DescribeEntry = {
 	path: string;
 	status: 'fresh' | 'stale' | 'unstamped' | 'missing' | string;
-	tool: string | null;
 	inputs: DescribeEntryInput[];
 };
 
