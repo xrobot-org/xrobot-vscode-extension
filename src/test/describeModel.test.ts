@@ -42,15 +42,12 @@ const BLINK: DescribeModule = {
 			parameters: [{ name: 'led', type: 'LibXR::GPIO&', default: null, default_fields: null, type_ref: null, candidates: ['LED_B'] }],
 		},
 	],
-	monitor: true,
 };
 
 function sampleDescribe(): DescribeResult {
 	const raw = {
 		schema: 1,
-		tool: 'xrobot 0.3.1',
 		config: 'User/xrobot.yaml',
-		register_sources: ['User/app_main.cpp'],
 		lock: { path: 'xrobot.lock', present: true, status: 'ok', modules: [] },
 		entry: {
 			path: 'User/xrobot_main.hpp',
@@ -116,7 +113,6 @@ function sampleDescribe(): DescribeResult {
 		instances: [
 			{ id: 'blinkled_0', module: 'xrobot-org/BlinkLED', class: 'BlinkLED', template_args: [], args: [{ led: 'LED_B' }, { blink_cycle: '250' }] },
 		],
-		settings: { monitor_sleep_ms: '1000' },
 		diagnostics: [{ severity: 'warning', scope: 'User/xrobot_main.hpp', message: 'generated from older xrobot.yaml; regenerate it' }],
 	};
 	const parsed = parseDescribeOutput(JSON.stringify(raw));

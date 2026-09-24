@@ -68,7 +68,6 @@ export type DescribeModule = {
 	standalone?: boolean;
 	template_parameters?: DescribeTemplateParameter[];
 	constructors?: DescribeConstructor[];
-	monitor?: boolean;
 	error?: string;
 };
 
@@ -99,16 +98,13 @@ export type DescribeDiagnostic = {
 
 export type DescribeResult = {
 	schema: number;
-	tool: string;
 	config: string;
-	register_sources: string[];
 	lock: DescribeLock;
 	entry: DescribeEntry;
 	registrations: Array<{ name: string; types: string[] }>;
 	modules: Record<string, DescribeModule>;
 	types: Record<string, DescribeType | null>;
 	instances: DescribeInstance[];
-	settings: Record<string, ValueTree>;
 	diagnostics: DescribeDiagnostic[];
 };
 
@@ -145,7 +141,6 @@ export function parseDescribeOutput(stdout: string): { ok: true; value: Describe
 	value.instances = Array.isArray(value.instances) ? value.instances : [];
 	value.diagnostics = Array.isArray(value.diagnostics) ? value.diagnostics : [];
 	value.registrations = Array.isArray(value.registrations) ? value.registrations : [];
-	value.settings = isRecord(value.settings) ? (value.settings as Record<string, ValueTree>) : {};
 	for (const instance of value.instances) {
 		instance.template_args = Array.isArray(instance.template_args) ? instance.template_args : [];
 		instance.args = Array.isArray(instance.args) ? instance.args : [];
