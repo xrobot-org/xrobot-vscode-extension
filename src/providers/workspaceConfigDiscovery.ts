@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { hasUsableXrobotConfig } from './xrobotConfigUtils';
+
 function toWorkspacePath(root: string, abs: string): string {
 	const rel = path.relative(root, abs).replace(/\\/g, '/');
 	return rel.startsWith('..') ? abs : rel;
@@ -32,12 +34,9 @@ function discoverUserYamlConfigsByKind(root: string, kind: 'xrobot' | 'libxr'): 
 				continue;
 			}
 			if (kind === 'xrobot') {
-				// Avoid treating unrelated YAMLs (e.g. generated ".config.yaml") as XRobot configs.
-				// XRobot configs must include "xrobot" in the filename (and must not be libxr configs).
-				if (lower.includes('libxr')) {
-					continue;
-				}
-				if (!lower.includes('xrobot')) {
+				// Decided by content, so product configs (e.g. User/RobotConfig/hero.yaml) are
+				// selectable while generated or unrelated YAML (".config.yaml") is not.
+				if (lower.includes('libxr') || !hasUsableXrobotConfig(abs)) {
 					continue;
 				}
 			} else if (!lower.includes('libxr')) {

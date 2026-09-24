@@ -25,15 +25,17 @@ suite('discoverUserXrobotConfigs', () => {
 		}
 	});
 
-	test('finds xrobot-named YAML configs under User/', () => {
+	test('finds XRobot-shaped YAML configs under User/ by content', () => {
 		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xrobot-ext-'));
 		try {
 			writeFile(tmp, 'User/xrobot.yaml', 'modules: []\n');
-			writeFile(tmp, 'User/subdir/my_xrobot_config.yml', 'modules: []\n');
-			writeFile(tmp, 'User/libxr_xrobot_mix.yaml', 'ignored: true\n'); // contains libxr => not xrobot config
+			writeFile(tmp, 'User/RobotConfig/hero.yaml', 'modules: []\nsettings:\n  monitor_sleep_ms: 1000\n');
+			writeFile(tmp, 'User/subdir/my_config.yml', 'settings: {}\n');
+			writeFile(tmp, 'User/libxr_xrobot_mix.yaml', 'modules: []\n'); // contains libxr => not xrobot config
 
 			assert.deepStrictEqual(discoverUserXrobotConfigs(tmp), [
-				'User/subdir/my_xrobot_config.yml',
+				'User/RobotConfig/hero.yaml',
+				'User/subdir/my_config.yml',
 				'User/xrobot.yaml',
 			]);
 		} finally {
