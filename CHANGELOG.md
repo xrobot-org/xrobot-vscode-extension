@@ -6,16 +6,74 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Migrate to the static-assembly XRobot toolchain (config `modules: [{module, id, template_args, args}]` + `settings`).
-- XRobot view is now driven by `xrobot_describe`: new Status group (lock status per Module, entry-header stamp state with the changed input, diagnostics), settings and instances read from its JSON.
-- Instances are added, edited and removed only through `xrobot_instance add|set|remove`; the new argument editor picks the constructor matching the current args, offers `XR_REGISTER` names / instance ids as candidates and edits struct parameters field by field (aggregates) or by constructor (classes).
-- New actions: `xrobot_setup --frozen`, `xrobot_setup --update`, and `xrobot_gen_main -c <config> -o <header> --register-source <src> --lock <lock>` (also used for auto-regeneration).
-- Remove the LibXR Hardware Container / `device_aliases` editor and its commands (aliases no longer exist in the toolchain).
-- Remove the module-manifest interface editor and all header manifest parsing; interfaces come from `xrobot_describe`.
-- An XRobot config is recognised by a `modules` list or a `settings` mapping.
-- CLIs run without a shell (arguments passed as an array); missing xrobot console scripts fall back to their Python entry point.
-- `Create Module` passes C++ constructor/template declarations to `xrobot_create_mod` (hardware tags removed).
-- YAML scalar edits keep comments and layout of the rest of the file.
+## [2.0.0]
+
+Requires XRobot 1.0 and its single `xrobot` command; the pre-1.0 commands
+(`xrobot_setup`, `xrobot_gen_main`, `xrobot_add_mod`, `xrobot_src_man`, ...) are no
+longer called.
+
+### Changed
+
+- The XRobot view is built from `xrobot describe` (schema 1): generated header state,
+  installed and pinned XRobot version, `xrobot.lock` state per Module, entry source and
+  `XR_REGISTER` registrations, diagnostics, the application configs (products) and the
+  instances of the selected product. The extension does not parse C++ or Module
+  manifests.
+- The selected product is the config `User/xrobot_main.hpp` was generated for;
+  selecting another product runs `xrobot gen -c <config>`. The
+  `xrobot.xrobot.configPath` setting is removed; the selection is not written to
+  `.vscode/settings.json`.
+- Instances are added, changed, renamed and removed only with
+  `xrobot instance add|set|rename|remove`. A value edit writes one node
+  (`args.<param>[.<field>|[n]]...`, `template_args[n]`) with `--if-match`, so a config
+  that changed after the view read it is not overwritten. After a successful edit the
+  header is regenerated with `xrobot gen` when `xrobot describe` reports no error.
+- Module requests are added and removed with `xrobot module add|remove`; changing a
+  request's ref removes it and adds `owner/Repo@ref` (restoring the old request if the
+  add fails). Refs are listed from the repository that `xrobot source get` resolves.
+- Sources are added with `xrobot source add-source URL --priority N`. Changing a
+  source's URL or priority and removing a source edit the entry with that URL in
+  `Modules/sources.yaml`, keeping comments; the official catalog is read-only.
+- Tree actions: `xrobot setup`, `setup --frozen`, `setup --update`, `gen`,
+  `format --check`, `format`, `new-module`; `xrobot init` in folders without
+  `Modules/modules.yaml`.
+- CLIs are started without a shell after a PATH lookup (PATH, pip per-user script
+  directories, `xrobot.cli.extraPath`). When a console script is missing, its Python
+  module runs from the extension directory without importing Python code from the
+  workspace.
+- The startup check runs asynchronously and only in XRobot BSPs (`Modules/modules.yaml`
+  present). It checks `git` and `xrobot`, and LibXR only when a `*.ioc` file is present.
+- In untrusted workspaces the workspace values of `xrobot.cli.extraPath` and
+  `xrobot.cli.pythonPath` are ignored.
+
+### Fixed
+
+- CLI output is decoded as UTF-8 from the complete byte stream and Python is asked to
+  write UTF-8 (`PYTHONIOENCODING=utf-8`); chunk-wise decoding could split multi-byte
+  characters, and on Windows with a GBK code page Chinese text was garbled.
+- Commands started from the command palette without a target ask for one; `Delete Repo`
+  used to remove the first request in `Modules/modules.yaml`.
+- Sources were edited by their position in the priority-sorted list, which could change
+  a different entry, including the official source.
+- Editing one value no longer rewrites the whole YAML file.
+- Exit codes of all CLI calls are checked and failures show the CLI's error message
+  (`Add Source` ignored failures).
+- Removing a Module request or a source asks for confirmation.
+- `.vscode-dev/` and agent notes (`AGENTS.md`) are excluded from the package.
+
+### Removed
+
+- The LibXR Hardware Container (`device_aliases`) editor, the Module manifest editor and
+  all header manifest parsing.
+- `Edit Repo Name` (remove the request and add another) and `Edit Source Mirror`
+  (XRobot 1.0 `sources.yaml` entries have no mirror field).
+- Editing `settings` of the XRobot config from the view.
+
+### Added
+
+- Unit tests for the CLI adapter (argument building, UTF-8 decoding, exit codes, the
+  Python fallback) using a fake `xrobot`, run with `npm test`; a GitHub Actions workflow
+  that compiles, lints, tests and packages the extension without publishing it.
 
 ## [1.0.1]
 
