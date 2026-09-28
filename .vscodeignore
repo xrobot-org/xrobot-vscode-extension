@@ -1,9 +1,16 @@
 .vscode/**
 .vscode-test/**
+.vscode-dev/**
+.github/**
 src/**
+out/test/**
 .gitignore
 .yarnrc
+.mocharc.json
 vsc-extension-quickstart.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 xrobot/**
 _artifacts/**
 **/tsconfig.json
@@ -11,3 +18,4 @@ _artifacts/**
 **/*.map
 **/*.ts
 **/.vscode-test.*
+*.vsix
