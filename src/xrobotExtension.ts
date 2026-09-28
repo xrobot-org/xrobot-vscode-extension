@@ -1,29 +1,45 @@
 import * as vscode from 'vscode';
-import { LibxrTreeProvider, XrobotTreeProvider } from './providers/viewProviders';
-import { registerXrobotCommands, registerWatchers, checkCliPrerequisites } from './commands/commandHandlers';
+import { LibxrTreeProvider, XrobotTreeProvider, registerWatchers } from './providers/viewProviders';
+import { registerXrobotCommands } from './commands/commandHandlers';
+import { checkDependencies } from './commands/xrobotCommands';
+import { initCliHost, outputChannel } from './cliHost';
+
+// File events arrive in bursts (a CLI rewrites several files); one refresh per burst
+// avoids starting and cancelling several `xrobot describe` runs.
+const REFRESH_DELAY_MS = 300;
 
 export function activate(context: vscode.ExtensionContext): void {
+	initCliHost(context);
 	const libxrProvider = new LibxrTreeProvider();
 	const xrobotProvider = new XrobotTreeProvider();
 
-	const refreshAll = (): void => {
+	const refreshNow = (): void => {
 		libxrProvider.refresh();
 		xrobotProvider.refresh();
 	};
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const refreshSoon = (): void => {
+		if (timer) {
+			clearTimeout(timer);
+		}
+		timer = setTimeout(() => {
+			timer = undefined;
+			refreshNow();
+		}, REFRESH_DELAY_MS);
+	};
+	context.subscriptions.push({ dispose: () => timer && clearTimeout(timer) });
 
-	const libxrView = vscode.window.createTreeView('xrobot.libxrView', {
-		treeDataProvider: libxrProvider,
-		showCollapseAll: true,
-	});
-	const xrobotView = vscode.window.createTreeView('xrobot.xrobotView', {
-		treeDataProvider: xrobotProvider,
-		showCollapseAll: true,
-	});
-	context.subscriptions.push(libxrView, xrobotView);
+	context.subscriptions.push(
+		vscode.window.createTreeView('xrobot.libxrView', { treeDataProvider: libxrProvider, showCollapseAll: true }),
+		vscode.window.createTreeView('xrobot.xrobotView', { treeDataProvider: xrobotProvider, showCollapseAll: true }),
+	);
 
-	registerXrobotCommands(context, refreshAll);
-	registerWatchers(context, refreshAll);
-	checkCliPrerequisites();
+	registerXrobotCommands(context, refreshNow);
+	registerWatchers(context, refreshSoon);
+	// Asynchronous and only in XRobot BSPs: activation is not blocked by process probes.
+	void checkDependencies(context.extensionPath).catch((error: unknown) => {
+		outputChannel.appendLine(`[check] ${error instanceof Error ? error.message : String(error)}`);
+	});
 }
 
 export function deactivate(): void {}

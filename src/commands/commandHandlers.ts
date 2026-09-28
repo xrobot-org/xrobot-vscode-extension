@@ -1,141 +1,79 @@
 import * as vscode from 'vscode';
 import {
-	addModuleInstance,
-	addRepoEntry,
-	addSourceEntry,
-	checkCliPrerequisites,
-	createModuleWizard,
-	deleteModuleInstance,
-	deleteRepo,
-	deleteSource,
-	editModuleInstance,
-	editRepoName,
-	editRepoVersion,
-	editSourceMirror,
-	editSourcePriority,
-	editSourceUrl,
 	editYamlScalar,
 	openUrl,
 	openWorkspaceFile,
-	outputChannel,
 	pickLibxrConfigPath,
 	pickWorkspaceFileForSetting,
-	pickXrobotConfigPath,
-	registerWatchers,
 	runCli,
 	type CliRunRequest,
 	type OpenFileTarget,
 } from '../providers/viewProviders';
 import type { InstanceEditTarget } from '../providers/instanceEditor';
+import {
+	addModuleInstance,
+	addRepo,
+	addSource,
+	createModuleWizard,
+	deleteModuleInstance,
+	deleteRepo,
+	deleteSource,
+	editModuleInstance,
+	editRepoVersion,
+	editSourcePriority,
+	editSourceUrl,
+	selectProduct,
+} from './xrobotCommands';
 
-export { checkCliPrerequisites, registerWatchers };
-
+// Tree items pass their target as the first argument; from the command palette the
+// argument is absent and the command asks for it (or does nothing when there is none).
 export function registerXrobotCommands(context: vscode.ExtensionContext, refreshAll: () => void): void {
-	context.subscriptions.push(outputChannel);
+	const register = (id: string, handler: (...args: never[]) => unknown): void => {
+		context.subscriptions.push(vscode.commands.registerCommand(id, handler));
+	};
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.helloWorld', () => {
-			vscode.window.showInformationMessage('Hello World from XRobot!');
-		}),
-	);
+	register('xrobot.helloWorld', () => {
+		void vscode.window.showInformationMessage('Hello World from XRobot!');
+	});
+	register('xrobot.runCli', async (request?: CliRunRequest) => {
+		await runCli(request);
+		refreshAll();
+	});
+	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));
+	register('xrobot.openUrl', (url?: string) => openUrl(url));
+	register('xrobot.refreshAll', () => refreshAll());
+	register('xrobot.collapseAllViews', async () => {
+		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
+		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');
+	});
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.runCli', async (request: CliRunRequest) => {
-			await runCli(request);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.openFile', async (target: OpenFileTarget | string) => {
-			await openWorkspaceFile(target);
-		}),
-		vscode.commands.registerCommand('xrobot.openUrl', async (url: string) => {
-			await openUrl(url);
-		}),
-		vscode.commands.registerCommand('xrobot.refreshAll', () => {
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.collapseAllViews', async () => {
-			await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
-			await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');
-		}),
-	);
+	register('xrobot.pickLibxrConfigPath', async () => {
+		await pickLibxrConfigPath();
+		refreshAll();
+	});
+	register('xrobot.pickLibxrAppMainPath', async () => {
+		await pickWorkspaceFileForSetting('xrobot.libxr.appMainPath', ['cpp', 'cc', 'cxx', 'c']);
+		refreshAll();
+	});
+	register('xrobot.editYamlScalar', async (filePath?: string, keyPath?: Array<string | number>) => {
+		await editYamlScalar(filePath, keyPath);
+		refreshAll();
+	});
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.pickLibxrConfigPath', async () => {
-			await pickLibxrConfigPath();
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.pickLibxrAppMainPath', async () => {
-			await pickWorkspaceFileForSetting('xrobot.libxr.appMainPath', ['cpp', 'cc', 'cxx', 'c']);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.pickXrobotConfigPath', async () => {
-			await pickXrobotConfigPath();
-			refreshAll();
-		}),
+	register('xrobot.selectProduct', (config?: string) => selectProduct(refreshAll, config));
+	register('xrobot.createModuleWizard', () => createModuleWizard());
+	register('xrobot.addModuleInstance', () => addModuleInstance(refreshAll));
+	register('xrobot.editModuleInstance', (instanceId?: string, target?: InstanceEditTarget) =>
+		editModuleInstance(refreshAll, instanceId, target),
 	);
+	register('xrobot.deleteModuleInstance', (instanceId?: string) => deleteModuleInstance(refreshAll, instanceId));
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.editYamlScalar', async (filePath: string, keyPath: Array<string | number>) => {
-			await editYamlScalar(filePath, keyPath);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.createModuleWizard', async () => {
-			await createModuleWizard();
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.addModuleInstance', async () => {
-			await addModuleInstance();
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editModuleInstance', async (instanceId?: string, target?: InstanceEditTarget) => {
-			await editModuleInstance(instanceId, target);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.deleteModuleInstance', async (instanceId?: string) => {
-			await deleteModuleInstance(instanceId);
-			refreshAll();
-		}),
-	);
+	register('xrobot.addRepo', () => addRepo(refreshAll));
+	register('xrobot.editRepoVersion', (id?: string) => editRepoVersion(refreshAll, id));
+	register('xrobot.deleteRepo', (id?: string) => deleteRepo(refreshAll, id));
 
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.addRepo', async () => {
-			await addRepoEntry();
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editRepoName', async (index: number) => {
-			await editRepoName(index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editRepoVersion', async (index: number) => {
-			await editRepoVersion(index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.deleteRepo', async (index: number) => {
-			await deleteRepo(index);
-			refreshAll();
-		}),
-	);
-
-	context.subscriptions.push(
-		vscode.commands.registerCommand('xrobot.addSource', async () => {
-			await addSourceEntry();
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editSourceUrl', async (index: number) => {
-			await editSourceUrl(index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editSourcePriority', async (index: number) => {
-			await editSourcePriority(index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.editSourceMirror', async (index: number) => {
-			await editSourceMirror(index);
-			refreshAll();
-		}),
-		vscode.commands.registerCommand('xrobot.deleteSource', async (index: number) => {
-			await deleteSource(index);
-			refreshAll();
-		}),
-	);
+	register('xrobot.addSource', () => addSource(refreshAll));
+	register('xrobot.editSourceUrl', (url?: string) => editSourceUrl(refreshAll, url));
+	register('xrobot.editSourcePriority', (url?: string) => editSourcePriority(refreshAll, url));
+	register('xrobot.deleteSource', (url?: string) => deleteSource(refreshAll, url));
 }

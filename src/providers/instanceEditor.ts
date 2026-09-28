@@ -1,27 +1,24 @@
 import * as vscode from 'vscode';
+import { isIdentifier, valuePath, type PathSegment } from '../cli/xrobotCli';
 import {
 	argName,
 	argValue,
 	cloneTree,
-	constructorSignature,
-	defaultArgsForConstructor,
+	containsNull,
+	fieldAt,
 	fieldShape,
-	findMatchingConstructor,
-	isCppIdentifier,
 	isRecord,
+	matchedParameter,
 	matchingShapeConstructor,
+	opaqueReason,
+	parameterCandidates,
 	parameterShape,
 	previewTree,
 	seedMapping,
-	withArgValue,
-	withTemplateArg,
-	type DescribeConstructor,
+	treeEquals,
 	type DescribeInstance,
 	type DescribeModule,
-	type DescribeParameter,
 	type DescribeResult,
-	type InstanceSetValues,
-	type NamedValue,
 	type ShapeField,
 	type ValueShape,
 	type ValueTree,
@@ -30,210 +27,243 @@ import {
 // What the tree asks the editor to open directly; omitted => ask the user.
 export type InstanceEditTarget =
 	| { kind: 'id' }
-	| { kind: 'arg'; name: string }
 	| { kind: 'template'; index: number }
-	| { kind: 'constructor' };
+	| { kind: 'arg'; name: string; path?: PathSegment[] };
 
-type TargetPickItem = vscode.QuickPickItem & { target?: InstanceEditTarget };
-type ValuePickItem = vscode.QuickPickItem & { action: 'apply' | 'field' | 'cpp' | 'constructor' | 'candidate'; key?: string | number };
+// One CLI write: `xrobot instance set ID PATH JSON` or `xrobot instance rename ID NEW_ID`.
+export type InstanceEdit =
+	| { kind: 'set'; path: string; value: ValueTree }
+	| { kind: 'rename'; newId: string };
+
+type TargetPickItem = vscode.QuickPickItem & { target: InstanceEditTarget };
+type ValuePickItem = vscode.QuickPickItem & {
+	action: 'apply' | 'field' | 'cpp' | 'structured' | 'constructor' | 'candidate';
+	key?: string | number;
+};
 
 const CPP_EXPRESSION_LABEL = '$(code) C++ expression…';
 
-// Interactive argument editor driven by xrobot_describe. Returns the values to pass to
-// `xrobot_instance set`, or undefined when nothing should be written.
+// Interactive editor driven by `xrobot describe`. Returns the single write to perform, or
+// undefined when nothing must be written (cancelled, or the value did not change).
+// Values the user did not enter are never written.
 export async function editInstanceInteractively(
 	describe: DescribeResult,
 	instance: DescribeInstance,
 	target?: InstanceEditTarget,
-): Promise<InstanceSetValues | undefined> {
+): Promise<InstanceEdit | undefined> {
 	const module = describe.modules[instance.module];
-	let args: NamedValue[] = instance.args.map((arg) => ({ ...arg }));
-	let argsReset = false;
-	const ctors = module?.constructors ?? [];
-	let ctorIndex = findMatchingConstructor(module, args);
-
-	const resetToConstructor = async (placeHolder: string): Promise<boolean> => {
-		const picked = await pickConstructor(ctors, placeHolder);
-		if (picked === undefined) {
-			return false;
-		}
-		ctorIndex = picked;
-		args = defaultArgsForConstructor(ctors[picked]);
-		argsReset = true;
-		return true;
-	};
-
-	if (target?.kind === 'id') {
-		const nextId = await promptInstanceId(describe, instance.id);
-		return nextId ? { id: nextId } : undefined;
+	const chosen = target ?? (await pickEditTarget(module, instance));
+	if (!chosen) {
+		return undefined;
 	}
-	if (target?.kind === 'template') {
-		const template = await editTemplateArg(module, instance, target.index);
-		return template ? { template_args: template } : undefined;
+	if (chosen.kind === 'id') {
+		const newId = await promptInstanceId(describe, instance.id);
+		return newId ? { kind: 'rename', newId } : undefined;
 	}
-	if (target?.kind === 'constructor') {
-		if (ctors.length === 0 || !(await resetToConstructor('Pick the constructor; args reset to its parameters and defaults'))) {
-			return undefined;
-		}
-	} else if (ctors.length > 0 && ctorIndex < 0) {
-		const placeHolder = `No constructor of ${module?.class ?? instance.module} matches args (${args
-			.map((a) => argName(a) ?? '?')
-			.join(', ')}); pick one to reset args to its defaults`;
-		if (!(await resetToConstructor(placeHolder))) {
-			return undefined;
-		}
+	if (chosen.kind === 'template') {
+		return editTemplateArg(module, instance, chosen.index);
 	}
-
-	let paramName = target?.kind === 'arg' ? target.name : undefined;
-	if (paramName && argsReset && argValue(args, paramName) === undefined) {
-		// The chosen constructor has no parameter of that name: let the user pick one.
-		paramName = undefined;
-	}
-	if (!paramName) {
-		const picked = await pickEditTarget(module, instance, args, ctorIndex, argsReset);
-		if (!picked) {
-			return argsReset ? { args } : undefined;
-		}
-		if (picked.kind === 'id') {
-			const nextId = await promptInstanceId(describe, instance.id);
-			if (!nextId) {
-				return argsReset ? { args } : undefined;
-			}
-			return argsReset ? { id: nextId, args } : { id: nextId };
-		}
-		if (picked.kind === 'template') {
-			const template = await editTemplateArg(module, instance, picked.index);
-			if (!template) {
-				return argsReset ? { args } : undefined;
-			}
-			return argsReset ? { template_args: template, args } : { template_args: template };
-		}
-		if (picked.kind === 'constructor') {
-			if (!(await resetToConstructor('Pick the constructor; args reset to its parameters and defaults'))) {
-				return undefined;
-			}
-			return { args };
-		}
-		paramName = picked.name;
-	}
-
-	const param = ctorIndex >= 0 ? ctors[ctorIndex].parameters.find((p) => p.name === paramName) : undefined;
-	const current = argValue(args, paramName);
-	const next = await editParameterValue(describe, paramName, param, current);
-	if (next === undefined) {
-		return argsReset ? { args } : undefined;
-	}
-	return { args: withArgValue(args, paramName, next) };
+	return editArgument(describe, module, instance, chosen.name, chosen.path ?? []);
 }
 
-async function pickEditTarget(
-	module: DescribeModule | undefined,
-	instance: DescribeInstance,
-	args: NamedValue[],
-	ctorIndex: number,
-	argsReset: boolean,
-): Promise<InstanceEditTarget | undefined> {
-	const ctor = ctorIndex >= 0 ? module?.constructors?.[ctorIndex] : undefined;
-	const items: TargetPickItem[] = [
-		{ label: `$(tag) id: ${instance.id}`, description: 'rename instance', target: { kind: 'id' } },
-	];
-	(module?.template_parameters ?? []).forEach((param, index) => {
+async function pickEditTarget(module: DescribeModule | undefined, instance: DescribeInstance): Promise<InstanceEditTarget | undefined> {
+	const items: TargetPickItem[] = [{ label: `$(tag) id: ${instance.id}`, description: 'rename instance', target: { kind: 'id' } }];
+	const templateParams = module?.template_parameters ?? [];
+	const templateCount = Math.max(templateParams.length, instance.template_args.length);
+	for (let index = 0; index < templateCount; index += 1) {
+		const param = templateParams[index];
 		items.push({
-			label: `$(symbol-type-parameter) ${param.name}: ${previewTree(instance.template_args[index] ?? param.default ?? null)}`,
-			description: `template ${param.type}`,
+			label: `$(symbol-type-parameter) ${param?.name ?? `#${index}`}: ${previewTree(instance.template_args[index])}`,
+			description: param ? `template ${param.type}` : 'template argument',
 			target: { kind: 'template', index },
 		});
-	});
-	const names = ctor ? ctor.parameters.map((p) => p.name) : args.map((a) => argName(a)).filter((n): n is string => !!n);
-	for (const name of names) {
-		const param = ctor?.parameters.find((p) => p.name === name);
+	}
+	for (const arg of instance.args) {
+		const name = argName(arg);
+		if (!name) {
+			continue;
+		}
+		const param = matchedParameter(module, instance, name);
 		items.push({
-			label: `$(symbol-field) ${name}: ${previewTree(argValue(args, name))}`,
+			label: `$(symbol-field) ${name}: ${previewTree(arg[name])}`,
 			description: param?.type,
 			target: { kind: 'arg', name },
 		});
 	}
-	if ((module?.constructors?.length ?? 0) > 1) {
-		items.push({ label: '$(list-ordered) Switch constructor…', description: 'resets args to defaults', target: { kind: 'constructor' } });
-	}
-	const moduleNote = module?.error ? ` (interface error: ${module.error})` : !module ? ' (module not in locked sources)' : '';
+	const note = module?.error ? ` (interface error: ${module.error})` : !module ? ' (Module not in the locked sources)' : '';
 	const picked = await vscode.window.showQuickPick(items, {
-		placeHolder: argsReset
-			? `Args of ${instance.id} reset to constructor defaults; pick a parameter to edit, or Esc to save the reset`
-			: `Edit ${instance.id} (${instance.module})${moduleNote}`,
+		placeHolder: `Edit ${instance.id} (${instance.module})${note}`,
 		matchOnDescription: true,
 	});
 	return picked?.target;
 }
 
-async function pickConstructor(ctors: DescribeConstructor[], placeHolder: string): Promise<number | undefined> {
-	if (ctors.length === 1) {
-		const ok = await vscode.window.showQuickPick([{ label: constructorSignature(ctors[0]), index: 0 }], { placeHolder });
-		return ok?.index;
-	}
-	const picked = await vscode.window.showQuickPick(
-		ctors.map((ctor, index) => ({
-			label: constructorSignature(ctor),
-			description: ctor.line ? `line ${ctor.line}` : undefined,
-			index,
-		})),
-		{ placeHolder },
-	);
-	return picked?.index;
-}
-
 async function promptInstanceId(describe: DescribeResult, currentId: string): Promise<string | undefined> {
 	const taken = new Set(describe.instances.map((i) => i.id).filter((id) => id !== currentId));
 	const next = await vscode.window.showInputBox({
-		prompt: `Rename instance ${currentId} (references to the old id in other instances are not rewritten)`,
+		prompt: `Rename instance ${currentId} (xrobot instance rename also updates references in this config)`,
 		value: currentId,
 		validateInput: (value) => {
 			const trimmed = value.trim();
-			if (!isCppIdentifier(trimmed)) {
+			if (!isIdentifier(trimmed)) {
 				return 'Instance id must be a C++ identifier';
 			}
-			if (taken.has(trimmed)) {
-				return `Instance id ${trimmed} already exists`;
-			}
-			return undefined;
+			return taken.has(trimmed) ? `Instance id ${trimmed} already exists` : undefined;
 		},
 	});
-	if (!next || next.trim() === currentId) {
-		return undefined;
-	}
-	return next.trim();
+	const trimmed = next?.trim();
+	return trimmed && trimmed !== currentId ? trimmed : undefined;
 }
 
 async function editTemplateArg(
 	module: DescribeModule | undefined,
 	instance: DescribeInstance,
 	index: number,
-): Promise<ValueTree[] | undefined> {
-	const params = module?.template_parameters ?? [];
-	const param = params[index];
-	const current = instance.template_args[index] ?? param?.default ?? null;
-	const input = await vscode.window.showInputBox({
-		prompt: `Template argument ${param?.name ?? `#${index}`}${param ? ` (${param.type})` : ''} of ${instance.id}`,
-		value: current === null || typeof current === 'object' ? '' : String(current),
-		placeHolder: 'C++ type or value, e.g. Mecanum',
-	});
-	if (input === undefined || !input.trim()) {
+): Promise<InstanceEdit | undefined> {
+	if (index >= instance.template_args.length) {
+		void vscode.window.showWarningMessage(
+			`${instance.id} has no template argument #${index} in its config; add it to template_args in the YAML first.`,
+		);
 		return undefined;
 	}
-	return withTemplateArg(instance.template_args, params, index, input.trim());
+	const param = module?.template_parameters?.[index];
+	const current = instance.template_args[index];
+	const text = await promptCppText(
+		`Template argument ${param?.name ?? `#${index}`} of ${instance.id}`,
+		param?.type,
+		current,
+		'C++ type or value, e.g. Mecanum',
+	);
+	if (text === undefined || treeEquals(text, current)) {
+		return undefined;
+	}
+	return { kind: 'set', path: valuePath('template_args', [index]), value: text };
 }
 
-// Edit one constructor parameter. Candidates first, then structured editing when the
-// generator accepts a mapping for it, else plain C++ text.
-export async function editParameterValue(
+function valueAt(root: ValueTree | undefined, segments: PathSegment[]): ValueTree | undefined {
+	let node = root;
+	for (const segment of segments) {
+		if (typeof segment === 'number') {
+			node = Array.isArray(node) ? node[segment] : undefined;
+		} else {
+			node = isRecord(node) ? (node as Record<string, ValueTree>)[segment] : undefined;
+		}
+	}
+	return node;
+}
+
+function segmentLabel(name: string, segments: PathSegment[]): string {
+	return segments.reduce<string>((text, s) => (typeof s === 'number' ? `${text}[${s}]` : `${text}.${s}`), name);
+}
+
+// Edit the value at args.<name><segments>. Mappings and lists are navigated down to the
+// value to change, so each edit writes one node.
+async function editArgument(
 	describe: DescribeResult,
+	module: DescribeModule | undefined,
+	instance: DescribeInstance,
 	name: string,
-	param: DescribeParameter | undefined,
+	segments: PathSegment[],
+): Promise<InstanceEdit | undefined> {
+	const root = argValue(instance.args, name);
+	if (root === undefined) {
+		void vscode.window.showWarningMessage(`${instance.id} has no argument ${name}.`);
+		return undefined;
+	}
+	if (segments.length > 0 && valueAt(root, segments) === undefined) {
+		void vscode.window.showWarningMessage(`${segmentLabel(name, segments)} is no longer in ${instance.id}.`);
+		return undefined;
+	}
+	const param = matchedParameter(module, instance, name);
+	// Esc goes back up to the level the edit started at, then cancels.
+	const startDepth = segments.length;
+	for (;;) {
+		const current = valueAt(root, segments);
+		const label = segmentLabel(name, segments);
+		const field: ShapeField | undefined =
+			segments.length === 0
+				? param && { name, type: param.type, typeRef: param.type_ref }
+				: fieldAt(param, segments, root, describe.types);
+		const shape = segments.length === 0 ? param && parameterShape(param, describe.types) : field && fieldShape(field, describe.types);
+
+		if (Array.isArray(current) || isRecord(current)) {
+			const entries: Array<[PathSegment, ValueTree]> = Array.isArray(current)
+				? current.map((v, i) => [i, v])
+				: Object.entries(current as Record<string, ValueTree>);
+			const items: ValuePickItem[] = entries.map(([key, v]) => ({
+				label: typeof key === 'number' ? `[${key}]` : key,
+				description: previewTree(v),
+				action: 'field',
+				key,
+			}));
+			items.push({ label: CPP_EXPRESSION_LABEL, description: `replace ${label} with C++ text`, action: 'cpp' });
+			if (shape) {
+				items.push({ label: '$(symbol-structure) Rebuild from the type…', description: shape.kind === 'constructors' ? 'choose a constructor' : 'all fields', action: 'structured' });
+			}
+			const picked = await vscode.window.showQuickPick(items, {
+				placeHolder: `${label}${field?.type ? ` (${field.type})` : ''}: pick the value to edit`,
+				matchOnDescription: true,
+			});
+			if (!picked) {
+				if (segments.length <= startDepth) {
+					return undefined;
+				}
+				segments = segments.slice(0, -1);
+				continue;
+			}
+			if (picked.action === 'field' && picked.key !== undefined) {
+				const key = picked.key;
+				if (typeof key === 'string' && !isIdentifier(key)) {
+					void vscode.window.showWarningMessage(`Key "${key}" cannot be addressed by xrobot instance set; edit the YAML directly.`);
+					continue;
+				}
+				segments = [...segments, key];
+				continue;
+			}
+			const next = picked.action === 'cpp'
+				? await promptCppText(label, field?.type, undefined)
+				: shape && (await buildShapedValue(describe, label, shape, current));
+			if (next === undefined) {
+				continue;
+			}
+			return setEdit(name, segments, current, next);
+		}
+
+		const candidates = segments.length === 0 ? parameterCandidates(instance, name, param) : [];
+		// describe explains why a type has no field editor (e.g. virtual functions).
+		const opaque = opaqueReason(field?.typeRef, describe.types);
+		const typeText = opaque ? `${field?.type}; C++ text only: ${opaque}` : field?.type;
+		const next = await pickScalarValue(describe, label, typeText, current, candidates, shape);
+		if (next === undefined) {
+			if (segments.length <= startDepth) {
+				return undefined;
+			}
+			segments = segments.slice(0, -1);
+			continue;
+		}
+		return setEdit(name, segments, current, next);
+	}
+}
+
+function setEdit(name: string, segments: PathSegment[], current: ValueTree | undefined, next: ValueTree): InstanceEdit | undefined {
+	if (treeEquals(current, next)) {
+		return undefined;
+	}
+	return { kind: 'set', path: valuePath('args', [name, ...segments]), value: next };
+}
+
+async function pickScalarValue(
+	describe: DescribeResult,
+	label: string,
+	type: string | undefined,
 	current: ValueTree | undefined,
+	candidates: string[],
+	shape: ValueShape | undefined,
 ): Promise<ValueTree | undefined> {
-	const shape = param ? parameterShape(param, describe.types) : undefined;
-	const candidates = param?.candidates ?? [];
-	if (candidates.length > 0) {
+	if (candidates.length === 0 && !shape) {
+		return promptCppText(label, type, current);
+	}
+	for (;;) {
 		const items: ValuePickItem[] = candidates.map((candidate) => ({
 			label: candidate,
 			description: candidate === current ? 'current' : undefined,
@@ -241,10 +271,10 @@ export async function editParameterValue(
 		}));
 		items.push({ label: CPP_EXPRESSION_LABEL, action: 'cpp' });
 		if (shape) {
-			items.push({ label: '$(symbol-structure) Structured value…', action: 'field' });
+			items.push({ label: '$(symbol-structure) Structured value…', description: shape.typeName, action: 'structured' });
 		}
 		const picked = await vscode.window.showQuickPick(items, {
-			placeHolder: `${name}${param ? ` (${param.type})` : ''}: pick a registered name / instance id`,
+			placeHolder: `${label}${type ? ` (${type})` : ''}: current ${previewTree(current)}`,
 		});
 		if (!picked) {
 			return undefined;
@@ -252,59 +282,68 @@ export async function editParameterValue(
 		if (picked.action === 'candidate') {
 			return picked.label;
 		}
-		if (picked.action === 'cpp') {
-			return promptCppText(name, param?.type, current);
+		const next = picked.action === 'cpp' ? await promptCppText(label, type, current) : shape && (await buildShapedValue(describe, label, shape, current));
+		if (next !== undefined) {
+			return next;
 		}
 	}
-	if (shape) {
-		return editShapedValue(describe, name, shape, current, true);
-	}
-	return promptCppText(name, param?.type, current);
 }
 
-async function promptCppText(label: string, type: string | undefined, current: ValueTree | undefined): Promise<ValueTree | undefined> {
+// C++ text input. Esc returns undefined; an empty value cannot be submitted.
+async function promptCppText(
+	label: string,
+	type: string | undefined,
+	current: ValueTree | undefined,
+	placeHolder = 'C++ expression',
+): Promise<string | undefined> {
 	const input = await vscode.window.showInputBox({
-		prompt: `${label}${type ? ` (${type})` : ''}: C++ expression; leave empty for null (not filled in)`,
+		prompt: `${label}${type ? ` (${type})` : ''}: C++ expression (Esc cancels, nothing is written)`,
 		value: typeof current === 'string' || typeof current === 'number' || typeof current === 'boolean' ? String(current) : '',
+		placeHolder,
+		validateInput: (value) => (value.trim() ? undefined : 'Enter a C++ expression, or press Esc to cancel'),
 	});
-	if (input === undefined) {
-		return undefined;
-	}
-	return input.trim() ? input.trim() : null;
+	return input === undefined ? undefined : input.trim();
 }
 
-// Mapping editor: aggregates walk their fields, classes first pick a constructor.
-// The produced mapping always lists exactly the shape's keys in declaration order.
-async function editShapedValue(
+// Build a complete mapping for a shaped value (aggregate fields, or one class
+// constructor's parameters), seeded from the current value and the source defaults.
+// Fields without a default start as `{}` (value-initialized), as `xrobot instance add`
+// seeds them; constructor parameters without a default must be filled before Apply.
+async function buildShapedValue(
 	describe: DescribeResult,
 	label: string,
 	shape: ValueShape,
 	current: ValueTree | undefined,
-	topLevel: boolean,
 ): Promise<ValueTree | undefined> {
 	let fields: ShapeField[];
 	if (shape.kind === 'constructors') {
 		const matched = matchingShapeConstructor(shape.constructors, current);
-		const picked = matched >= 0 && shape.constructors.length === 1
-			? matched
-			: await pickShapeConstructor(shape, matched, label);
-		if (picked === undefined) {
+		const picked = await vscode.window.showQuickPick(
+			shape.constructors.map((ctor, index) => ({
+				label: `${shape.typeName}(${ctor.map((f) => `${f.type ?? ''} ${f.name}`.trim()).join(', ')})`,
+				description: index === matched ? 'current' : undefined,
+				index,
+			})),
+			{ placeHolder: `${label}: pick the ${shape.typeName} constructor` },
+		);
+		if (!picked) {
 			return undefined;
 		}
-		if (picked === 'cpp') {
-			return promptCppText(label, shape.typeName, current);
-		}
-		fields = shape.constructors[picked];
+		fields = shape.constructors[picked.index];
 	} else {
-		fields = shape.fields;
+		fields = shape.fields.map((f) =>
+			f.defaultTree === undefined && (f.defaultText === null || f.defaultText === undefined) ? { ...f, defaultText: '{}' } : f,
+		);
 	}
 	const value = seedMapping(fields, current);
-	// C++ text cannot be split into fields; the mapping then starts from the defaults.
-	const note = typeof current === 'string' && current.trim() ? ' (was C++ text; fields start from defaults)' : '';
-
 	for (;;) {
+		const unfilled = fields.filter((f) => containsNull(value[f.name] ?? null)).map((f) => f.name);
 		const items: ValuePickItem[] = [
-			{ label: topLevel ? '$(check) Apply' : '$(check) Done', description: `${label} with ${fields.length} fields`, action: 'apply' },
+			{
+				label: '$(check) Apply',
+				description: unfilled.length > 0 ? `fill ${unfilled.join(', ')} first` : `write ${label}`,
+				action: 'apply',
+			},
 			...fields.map((field) => ({
 				label: field.name,
 				description: previewTree(value[field.name]),
@@ -312,120 +351,32 @@ async function editShapedValue(
 				action: 'field' as const,
 				key: field.name,
 			})),
-			{ label: CPP_EXPRESSION_LABEL, description: 'replace the mapping with C++ text', action: 'cpp' },
 		];
-		if (shape.kind === 'constructors' && shape.constructors.length > 1) {
-			items.push({ label: '$(list-ordered) Choose another constructor…', action: 'constructor' });
-		}
 		const picked = await vscode.window.showQuickPick(items, {
-			placeHolder: `${label}${shape.typeName ? ` (${shape.typeName})` : ''}: pick a field to edit${note}`,
+			placeHolder: `${label}${shape.typeName ? ` (${shape.typeName})` : ''}: edit fields, then Apply (Esc cancels, nothing is written)`,
 			matchOnDescription: true,
 		});
 		if (!picked) {
 			return undefined;
 		}
 		if (picked.action === 'apply') {
-			return value;
-		}
-		if (picked.action === 'cpp') {
-			const text = await promptCppText(label, shape.typeName, current);
-			if (text !== undefined) {
-				return text;
+			if (unfilled.length > 0) {
+				void vscode.window.showWarningMessage(`Fill ${unfilled.join(', ')} before applying ${label}.`);
+				continue;
 			}
-			continue;
-		}
-		if (picked.action === 'constructor') {
-			return editShapedValue(describe, label, shape, undefined, topLevel);
+			return value;
 		}
 		const field = fields.find((f) => f.name === picked.key);
 		if (!field) {
 			continue;
 		}
-		const next = await editFieldValue(describe, `${label}.${field.name}`, field, value[field.name]);
+		const nested = fieldShape(field, describe.types);
+		const fieldLabel = `${label}.${field.name}`;
+		const next = nested
+			? await pickScalarValue(describe, fieldLabel, field.type, value[field.name], [], nested)
+			: await promptCppText(fieldLabel, field.type, value[field.name]);
 		if (next !== undefined) {
-			value[field.name] = next;
-		}
-	}
-}
-
-async function pickShapeConstructor(
-	shape: Extract<ValueShape, { kind: 'constructors' }>,
-	matched: number,
-	label: string,
-): Promise<number | 'cpp' | undefined> {
-	const items: Array<vscode.QuickPickItem & { index: number | 'cpp' }> = shape.constructors.map((ctor, index) => ({
-		label: `${shape.typeName}(${ctor.map((f) => `${f.type ?? ''} ${f.name}`.trim()).join(', ')})`,
-		description: index === matched ? 'current' : undefined,
-		index,
-	}));
-	items.push({ label: CPP_EXPRESSION_LABEL, index: 'cpp' });
-	const picked = await vscode.window.showQuickPick(items, { placeHolder: `${label}: pick the ${shape.typeName} constructor` });
-	return picked?.index;
-}
-
-async function editFieldValue(
-	describe: DescribeResult,
-	label: string,
-	field: ShapeField,
-	current: ValueTree,
-): Promise<ValueTree | undefined> {
-	const shape = fieldShape(field, describe.types);
-	if (shape) {
-		return editShapedValue(describe, label, shape, current, false);
-	}
-	if (Array.isArray(current) || isRecord(current)) {
-		return editFreeTree(label, field.type, current);
-	}
-	return promptCppText(label, field.type, current);
-}
-
-// Lists and mappings without a known shape: keep their keys/length, edit elements.
-async function editFreeTree(label: string, type: string | undefined, current: ValueTree[] | Record<string, ValueTree>): Promise<ValueTree | undefined> {
-	const value = cloneTree(current) as ValueTree[] | Record<string, ValueTree>;
-	for (;;) {
-		const entries: Array<[string | number, ValueTree]> = Array.isArray(value)
-			? value.map((v, i) => [i, v])
-			: Object.entries(value);
-		const items: ValuePickItem[] = [
-			{ label: '$(check) Done', description: label, action: 'apply' },
-			...entries.map(([key, v]) => ({
-				label: typeof key === 'number' ? `[${key}]` : key,
-				description: previewTree(v),
-				action: 'field' as const,
-				key,
-			})),
-			{ label: CPP_EXPRESSION_LABEL, description: 'replace with C++ text', action: 'cpp' },
-		];
-		const picked = await vscode.window.showQuickPick(items, { placeHolder: `${label}${type ? ` (${type})` : ''}: pick an element to edit` });
-		if (!picked) {
-			return undefined;
-		}
-		if (picked.action === 'apply') {
-			return value;
-		}
-		if (picked.action === 'cpp') {
-			const text = await promptCppText(label, type, undefined);
-			if (text !== undefined) {
-				return text;
-			}
-			continue;
-		}
-		const key = picked.key;
-		if (key === undefined) {
-			continue;
-		}
-		const element = Array.isArray(value) ? value[key as number] : value[key as string];
-		const childLabel = typeof key === 'number' ? `${label}[${key}]` : `${label}.${key}`;
-		const next = Array.isArray(element) || isRecord(element)
-			? await editFreeTree(childLabel, undefined, element as ValueTree[] | Record<string, ValueTree>)
-			: await promptCppText(childLabel, undefined, element);
-		if (next === undefined) {
-			continue;
-		}
-		if (Array.isArray(value)) {
-			value[key as number] = next;
-		} else {
-			value[key as string] = next;
+			value[field.name] = cloneTree(next);
 		}
 	}
 }

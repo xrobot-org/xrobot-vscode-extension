@@ -1,14 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { hasUsableXrobotConfig } from './xrobotConfigUtils';
-
-function toWorkspacePath(root: string, abs: string): string {
-	const rel = path.relative(root, abs).replace(/\\/g, '/');
-	return rel.startsWith('..') ? abs : rel;
-}
-
-function discoverUserYamlConfigsByKind(root: string, kind: 'xrobot' | 'libxr'): string[] {
+// LibXR configs selectable in the LibXR view: YAML files under User/ whose name contains
+// "libxr". (XRobot application configs are listed by `xrobot describe`.)
+export function discoverUserLibxrConfigs(root: string): string[] {
 	const userDir = path.join(root, 'User');
 	if (!fs.existsSync(userDir)) {
 		return [];
@@ -26,33 +21,11 @@ function discoverUserYamlConfigsByKind(root: string, kind: 'xrobot' | 'libxr'): 
 				stack.push(abs);
 				continue;
 			}
-			if (!entry.isFile()) {
-				continue;
-			}
 			const lower = entry.name.toLowerCase();
-			if (!(lower.endsWith('.yaml') || lower.endsWith('.yml'))) {
-				continue;
+			if (entry.isFile() && (lower.endsWith('.yaml') || lower.endsWith('.yml')) && lower.includes('libxr')) {
+				result.push(path.relative(root, abs).replace(/\\/g, '/'));
 			}
-			if (kind === 'xrobot') {
-				// Decided by content, so product configs (e.g. User/RobotConfig/hero.yaml) are
-				// selectable while generated or unrelated YAML (".config.yaml") is not.
-				if (lower.includes('libxr') || !hasUsableXrobotConfig(abs)) {
-					continue;
-				}
-			} else if (!lower.includes('libxr')) {
-				continue;
-			}
-			result.push(toWorkspacePath(root, abs));
 		}
 	}
-	result.sort((a, b) => a.localeCompare(b));
-	return result;
-}
-
-export function discoverUserXrobotConfigs(root: string): string[] {
-	return discoverUserYamlConfigsByKind(root, 'xrobot');
-}
-
-export function discoverUserLibxrConfigs(root: string): string[] {
-	return discoverUserYamlConfigsByKind(root, 'libxr');
+	return result.sort((a, b) => a.localeCompare(b));
 }
