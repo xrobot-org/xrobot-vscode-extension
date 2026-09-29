@@ -108,7 +108,15 @@ suite('xrobot argument builders', () => {
 		);
 	});
 
+	test('constructor switch: the whole list is one JSON element for PATH args', () => {
+		const list = [{ led: 'LED_B' }, { frequency_hz: '2.0f' }];
+		assert.deepStrictEqual(xrobotArgs.instanceSet(root, config, 'led', valuePath('args', []), list, 'a'.repeat(64)), [
+			'-C', root, 'instance', '-c', config, 'set', 'led', 'args', '[{"led":"LED_B"},{"frequency_hz":"2.0f"}]', '--if-match', 'a'.repeat(64),
+		]);
+	});
+
 	test('value paths follow the instance set syntax', () => {
+		assert.strictEqual(valuePath('args', []), 'args');
 		assert.strictEqual(valuePath('args', ['param']), 'args.param');
 		assert.strictEqual(valuePath('args', ['param', 'timing', 'on_ms']), 'args.param.timing.on_ms');
 		assert.strictEqual(valuePath('args', ['topics', 1, 'name']), 'args.topics[1].name');
@@ -216,6 +224,19 @@ suite('running the CLI (fake xrobot)', () => {
 		assert.deepStrictEqual(recorded.args, args);
 		assert.strictEqual(fs.realpathSync(recorded.cwd), fs.realpathSync(dir));
 		assert.strictEqual(recorded.encoding, 'utf-8');
+	});
+
+	test('a constructor switch reaches the tool as one args list', async () => {
+		const root = path.join(dir, 'my bsp');
+		const list = [{ led: '"闪烁"' }, { frequency_hz: '2.0f' }, { inverted: null }];
+		const args = xrobotArgs.instanceSet(root, path.join(root, 'User', 'xrobot.yaml'), 'blink', 'args', list, 'b'.repeat(64));
+		const outcome = await startInvocation(invocation, 'xrobot', args, env()).done;
+		assert.ok(outcome.ok, outcome.message);
+		const recorded = JSON.parse(fs.readFileSync(log, 'utf8'));
+		const at = recorded.args.indexOf('args');
+		assert.deepStrictEqual(recorded.args.slice(at - 2, at), ['set', 'blink']);
+		assert.deepStrictEqual(JSON.parse(recorded.args[at + 1]), list);
+		assert.deepStrictEqual(recorded.args.slice(at + 2), ['--if-match', 'b'.repeat(64)]);
 	});
 
 	test('stdout is decoded as UTF-8 even when a character is split across chunks', async () => {

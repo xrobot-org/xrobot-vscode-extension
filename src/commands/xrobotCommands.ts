@@ -182,6 +182,11 @@ export async function editModuleInstance(refresh: Refresh, instanceId?: string, 
 		refresh();
 		return;
 	}
+	if (edit.kind === 'set' && edit.added && edit.added.length > 0) {
+		void vscode.window.showInformationMessage(
+			`${instance.id}: new parameters ${edit.added.join(', ')} take their source defaults; null means not filled in.`,
+		);
+	}
 	await reloadAndRegenerate(root, refresh);
 }
 

@@ -178,6 +178,38 @@ export function findMatchingConstructor(module: DescribeModule | undefined, args
 	return (module?.constructors ?? []).findIndex((ctor) => ctor.parameters.map((p) => p.name).join('\u0000') === names);
 }
 
+export type ConstructorSwitch = {
+	// The complete new argument list, in the constructor's parameter order.
+	args: NamedValue[];
+	// Parameters whose value is kept from the current args (same name).
+	kept: string[];
+	// Parameters that are new: filled from describe's default (a designated/brace default
+	// as its mapping, else the default text, else null = not filled in).
+	added: string[];
+	// Current args the constructor does not take.
+	dropped: string[];
+};
+
+// Constructor switch (D8): same-named parameter values are kept, only new parameters get
+// their source default.
+export function switchConstructorArgs(current: NamedValue[], ctor: DescribeConstructor): ConstructorSwitch {
+	const kept: string[] = [];
+	const added: string[] = [];
+	const args = ctor.parameters.map((param): NamedValue => {
+		const existing = current.find((arg) => argName(arg) === param.name);
+		if (existing) {
+			kept.push(param.name);
+			return { [param.name]: cloneTree(existing[param.name]) };
+		}
+		added.push(param.name);
+		const fields = isRecord(param.default_fields) ? (param.default_fields as Record<string, ValueTree>) : undefined;
+		return { [param.name]: fields ? cloneTree(fields) : param.default ?? null };
+	});
+	const names = new Set(ctor.parameters.map((p) => p.name));
+	const dropped = current.map((arg) => argName(arg)).filter((name): name is string => !!name && !names.has(name));
+	return { args, kept, added, dropped };
+}
+
 export function matchedParameter(
 	module: DescribeModule | undefined,
 	instance: DescribeInstance,

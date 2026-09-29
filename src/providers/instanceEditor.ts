@@ -4,9 +4,11 @@ import {
 	argName,
 	argValue,
 	cloneTree,
+	constructorSignature,
 	containsNull,
 	fieldAt,
 	fieldShape,
+	findMatchingConstructor,
 	isRecord,
 	matchedParameter,
 	matchingShapeConstructor,
@@ -15,6 +17,7 @@ import {
 	parameterShape,
 	previewTree,
 	seedMapping,
+	switchConstructorArgs,
 	treeEquals,
 	type DescribeInstance,
 	type DescribeModule,
@@ -28,11 +31,14 @@ import {
 export type InstanceEditTarget =
 	| { kind: 'id' }
 	| { kind: 'template'; index: number }
-	| { kind: 'arg'; name: string; path?: PathSegment[] };
+	| { kind: 'arg'; name: string; path?: PathSegment[] }
+	| { kind: 'constructor' };
 
 // One CLI write: `xrobot instance set ID PATH JSON` or `xrobot instance rename ID NEW_ID`.
+// A constructor switch is a set of PATH `args` (the whole list); `added` names the
+// parameters that got their default.
 export type InstanceEdit =
-	| { kind: 'set'; path: string; value: ValueTree }
+	| { kind: 'set'; path: string; value: ValueTree; added?: string[] }
 	| { kind: 'rename'; newId: string };
 
 type TargetPickItem = vscode.QuickPickItem & { target: InstanceEditTarget };
@@ -63,6 +69,9 @@ export async function editInstanceInteractively(
 	if (chosen.kind === 'template') {
 		return editTemplateArg(module, instance, chosen.index);
 	}
+	if (chosen.kind === 'constructor') {
+		return switchConstructor(module, instance);
+	}
 	return editArgument(describe, module, instance, chosen.name, chosen.path ?? []);
 }
 
@@ -90,12 +99,81 @@ async function pickEditTarget(module: DescribeModule | undefined, instance: Desc
 			target: { kind: 'arg', name },
 		});
 	}
+	if (canSwitchConstructor(module, instance)) {
+		items.push({ label: '$(list-ordered) Switch constructor…', description: 'keeps same-named values', target: { kind: 'constructor' } });
+	}
 	const note = module?.error ? ` (interface error: ${module.error})` : !module ? ' (Module not in the locked sources)' : '';
 	const picked = await vscode.window.showQuickPick(items, {
 		placeHolder: `Edit ${instance.id} (${instance.module})${note}`,
 		matchOnDescription: true,
 	});
 	return picked?.target;
+}
+
+// Another constructor exists, or the current args match none.
+export function canSwitchConstructor(module: DescribeModule | undefined, instance: DescribeInstance): boolean {
+	const count = module?.constructors?.length ?? 0;
+	return count > 1 || (count === 1 && findMatchingConstructor(module, instance.args) < 0);
+}
+
+type SwitchPickItem = vscode.QuickPickItem & { index?: number; apply?: boolean };
+
+// Constructor switch (D8): pick another constructor, preview the new argument list with
+// the new parameters marked, then write it as one `instance set ID args <list>`.
+// Same-named values are kept; only new parameters take describe's default. Esc at any
+// step writes nothing.
+async function switchConstructor(module: DescribeModule | undefined, instance: DescribeInstance): Promise<InstanceEdit | undefined> {
+	const ctors = module?.constructors ?? [];
+	const current = findMatchingConstructor(module, instance.args);
+	const choices = ctors.map((ctor, index) => ({ ctor, index })).filter(({ index }) => index !== current);
+	if (!module || choices.length === 0) {
+		void vscode.window.showInformationMessage(`${instance.module} has no other constructor.`);
+		return undefined;
+	}
+	const describeSwitch = (names: string[]): string => (names.length > 0 ? names.join(', ') : 'none');
+	const picked = await vscode.window.showQuickPick<SwitchPickItem>(
+		choices.map(({ ctor, index }) => {
+			const change = switchConstructorArgs(instance.args, ctor);
+			return {
+				label: `${module.class}${constructorSignature(ctor)}`,
+				description: ctor.line ? `line ${ctor.line}` : undefined,
+				detail: `keeps ${describeSwitch(change.kept)}; new ${describeSwitch(change.added)}; drops ${describeSwitch(change.dropped)}`,
+				index,
+			};
+		}),
+		{
+			placeHolder: `Constructor for ${instance.id}${current < 0 ? ' (its args match no constructor)' : ''}`,
+			matchOnDetail: true,
+		},
+	);
+	if (picked?.index === undefined) {
+		return undefined;
+	}
+	const ctor = ctors[picked.index];
+	const change = switchConstructorArgs(instance.args, ctor);
+	const items: SwitchPickItem[] = [
+		{ label: '$(check) Apply', description: `write args of ${module.class}${constructorSignature(ctor)}`, apply: true },
+		...change.args.map((arg): SwitchPickItem => {
+			const name = argName(arg) ?? '?';
+			const isNew = change.added.includes(name);
+			return {
+				label: `${isNew ? '$(diff-added)' : '$(circle-small)'} ${name}: ${previewTree(arg[name])}`,
+				description: isNew ? (arg[name] === null ? 'NEW: no default, not filled in' : 'NEW: source default') : 'kept',
+			};
+		}),
+		...change.dropped.map((name): SwitchPickItem => ({ label: `$(diff-removed) ${name}`, description: 'dropped' })),
+	];
+	for (;;) {
+		const confirm = await vscode.window.showQuickPick(items, {
+			placeHolder: `${instance.id}: new parameters are marked NEW; pick Apply to write, Esc to cancel`,
+		});
+		if (!confirm) {
+			return undefined;
+		}
+		if (confirm.apply) {
+			return { kind: 'set', path: valuePath('args', []), value: change.args, added: change.added };
+		}
+	}
 }
 
 async function promptInstanceId(describe: DescribeResult, currentId: string): Promise<string | undefined> {

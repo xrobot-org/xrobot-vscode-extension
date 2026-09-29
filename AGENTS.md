@@ -30,7 +30,8 @@ A VS Code sidebar for XRobot 1.0 BSPs and the LibXR STM32 generator:
 - Selected product = describe `selected` (the config the header was generated for). Never write it to
   `.vscode/settings.json`; switching = `xrobot gen -c <config>`.
 - Config edits only via `xrobot instance add|set|rename|remove`; `set` writes one node with
-  `--if-match`. Never write a value the user did not enter; cancel writes nothing.
+  `--if-match`. Constructor switch (D8): `set ID args <list>`, same-named values kept, new
+  parameters from describe defaults and marked in the preview. Never write a value the user did not enter; cancel writes nothing.
 - Commands invoked without a target ask for it (or do nothing). Deletes ask for confirmation.
 - Sources: identity is the URL; the official catalog (`https://xrobot.work/xrobot-modules/index.yaml`)
   is read-only.

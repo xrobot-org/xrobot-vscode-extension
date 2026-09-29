@@ -15,7 +15,9 @@ import {
 	parseDescribeOutput,
 	seedMapping,
 	shouldRegenerate,
+	switchConstructorArgs,
 	typeShape,
+	type DescribeConstructor,
 	type DescribeResult,
 } from '../../providers/describeModel';
 
@@ -129,6 +131,41 @@ suite('mapping shapes', () => {
 	test('containsNull finds unfilled values at any depth', () => {
 		assert.strictEqual(containsNull({ a: '1', b: ['2', { c: null }] }), true);
 		assert.strictEqual(containsNull({ a: '1', b: ['2'] }), false);
+	});
+});
+
+suite('constructor switch', () => {
+	// BlinkLED with a second constructor, as `xrobot describe` reports it (scratch BSP).
+	const frequencyCtor: DescribeConstructor = {
+		line: 59,
+		parameters: [
+			{ name: 'led', type: 'LibXR::GPIO&', default: null, dependency: true, default_fields: null, type_ref: null, candidates: [] },
+			{ name: 'frequency_hz', type: 'float', default: '2.0f', dependency: false, default_fields: null, type_ref: null, candidates: [] },
+			{ name: 'inverted', type: 'bool', default: 'false', dependency: false, default_fields: null, type_ref: null, candidates: [] },
+		],
+	};
+
+	test('keeps same-named values, defaults only new parameters, reports dropped ones', () => {
+		const change = switchConstructorArgs([{ led: '"闪烁"' }, { blink_cycle: '500' }], frequencyCtor);
+		assert.deepStrictEqual(change.args, [{ led: '"闪烁"' }, { frequency_hz: '2.0f' }, { inverted: 'false' }]);
+		assert.deepStrictEqual(change.kept, ['led']);
+		assert.deepStrictEqual(change.added, ['frequency_hz', 'inverted']);
+		assert.deepStrictEqual(change.dropped, ['blink_cycle']);
+	});
+
+	test('a user value wins over the default; new dependencies stay null; mappings are copied', () => {
+		const d = load();
+		const motorCtor = d.modules['QDU-Robomaster/RMMotor'].constructors![0];
+		const current = [{ param: { model: 'X', reverse: 'true', feedback_id: '0x205' } }];
+		const change = switchConstructorArgs(current, motorCtor);
+		assert.deepStrictEqual(change.args, [{ can_bus: null }, { param: { model: 'X', reverse: 'true', feedback_id: '0x205' } }]);
+		assert.deepStrictEqual(change.added, ['can_bus']);
+		(change.args[1].param as Record<string, string>).model = 'changed';
+		assert.strictEqual(current[0].param.model, 'X', 'the current args are not modified');
+		// A new parameter with a designated default gets its mapping.
+		assert.deepStrictEqual(switchConstructorArgs([], motorCtor).args[1], {
+			param: { model: 'RMMotor::Model::MOTOR_M3508', reverse: 'false', feedback_id: '0x201' },
+		});
 	});
 });
 

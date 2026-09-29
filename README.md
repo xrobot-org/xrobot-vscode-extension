@@ -40,10 +40,11 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
 | --- | --- |
 | add / remove an instance | `xrobot instance -c <config> add MODULE [--id ID]` / `remove ID` |
 | change one value | `xrobot instance -c <config> set ID PATH JSON --if-match <sha256>` |
+| switch an instance to another constructor | `xrobot instance -c <config> set ID args '<JSON list>' --if-match <sha256>` |
 | rename an instance (and its references) | `xrobot instance -c <config> rename ID NEW_ID` |
 | select the product | `xrobot gen -c <config>` |
 | add / remove a Module request | `xrobot module add owner/Repo[@ref]` / `module remove owner/Repo` |
-| change a request's ref | `xrobot module remove` then `xrobot module add owner/Repo@ref` (the old request is added back if the add fails) |
+| change a request's ref | `xrobot module remove` then `xrobot module add owner/Repo@ref` (the old request is added back if the add fails; the request moves to the end of the list) |
 | add a source | `xrobot source --sources Modules/sources.yaml add-source URL --priority N` |
 | change a source's URL or priority, remove a source | edited in `Modules/sources.yaml` by URL, keeping comments (the CLI has no command for it); never the official catalog |
 
@@ -51,6 +52,11 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
   `[n]`, `template_args[n]`). `--if-match` carries the hash of the config as it
   was when the view read it; if the file changed since, the CLI refuses and the
   view reloads.
+- Constructor switch: pick another constructor of the Module (from `xrobot
+  describe`); the preview keeps every value whose parameter name also exists in the
+  new constructor, gives new parameters their source default (`null`, "not filled
+  in", when there is none) and marks them NEW; dropped arguments are listed. Apply
+  writes the whole list with one `instance set ID args`.
 - Cancelling a prompt writes nothing; an unchanged value is not written; an empty
   C++ expression cannot be submitted.
 - Commands started from the command palette ask for their target; deleting
@@ -63,12 +69,8 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
 
 ### Not provided
 
-- Switching an instance to another constructor: `xrobot instance set` replaces a
-  single argument and cannot replace the argument list. Edit `args` in the config;
-  the view marks arguments that match no constructor and lists the signatures.
 - Editing `settings` (e.g. `monitor_sleep_ms`): not covered by `xrobot instance`;
   edit the config file.
-- `xrobot module add|remove` write `Modules/modules.yaml` in the CLI's layout.
 
 ## How the CLIs are run
 

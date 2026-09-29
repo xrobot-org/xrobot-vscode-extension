@@ -21,7 +21,7 @@ import {
 	type ValueTree,
 } from './describeModel';
 import { readModuleRequests, readSources } from './workspaceFiles';
-import type { InstanceEditTarget } from './instanceEditor';
+import { canSwitchConstructor, type InstanceEditTarget } from './instanceEditor';
 import { xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
@@ -569,6 +569,10 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 					tooltip: module.constructors.map(constructorSignature).join('\n'),
 				}),
 			);
+		}
+		if (canSwitchConstructor(module, instance)) {
+			const target: InstanceEditTarget = { kind: 'constructor' };
+			nodes.push(opNode('switch constructor…', 'xrobot.editModuleInstance', [instance.id, target], 'keeps same-named values', 'list-ordered'));
 		}
 		for (const arg of instance.args) {
 			const name = argName(arg);
