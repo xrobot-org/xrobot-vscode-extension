@@ -226,7 +226,7 @@ export type NewModuleOptions = {
 	outDir: string;
 };
 
-// `instance set` PATH: `id`, `template_args[n]`, `args.<param>`, `args.<param>.<field>...`,
+// `instance set` PATH: `template_args[n]`, `args.<param>`, `args.<param>.<field>...`,
 // `[n]` for list elements.
 export type PathSegment = string | number;
 
