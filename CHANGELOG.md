@@ -45,6 +45,9 @@ longer called.
 - The Create Module wizard passes each dependency with its own `--depends` and, for a
   Module with template parameters, asks for the template arguments the Module CI
   compiles with (`--template-arg`).
+- The CLIs run with `XR_LANG` set from the VS Code display language (unless the user set
+  it), so their messages are Chinese in a Chinese VS Code and English otherwise; a
+  failure message skips warning lines in either language.
 - CLIs are started without a shell after a PATH lookup (PATH, pip per-user script
   directories, `xrobot.cli.extraPath`). When a console script is missing, its Python
   module runs from the extension directory without importing Python code from the

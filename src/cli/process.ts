@@ -169,8 +169,8 @@ export function failureMessage(result: ProcessResult, command: string): string {
 		.split(/\r?\n/)
 		.map((line) => line.trim())
 		.filter(Boolean)
-		// Warnings the tool prints before an error are not the error.
-		.filter((line) => !/^warning:/i.test(line));
+		// Warnings the tool prints before an error are not the error (English or Chinese output).
+		.filter((line) => !/^(warning:|警告[:：])/i.test(line));
 	if (lines.length > 0) {
 		return lines[lines.length - 1];
 	}

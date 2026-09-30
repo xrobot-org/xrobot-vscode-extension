@@ -35,7 +35,7 @@ export function isXrobotBsp(root: string): boolean {
 
 export function cliEnv(): NodeJS.ProcessEnv {
 	const extraPath = vscode.workspace.getConfiguration('xrobot.cli').get<string>('extraPath', '');
-	return cliEnvironment(process.env, extraPath);
+	return cliEnvironment(process.env, extraPath, process.platform, vscode.env.language);
 }
 
 export function invocationFor(tool: string, root: string, env: NodeJS.ProcessEnv = cliEnv()): Invocation | undefined {

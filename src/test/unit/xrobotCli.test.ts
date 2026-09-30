@@ -150,6 +150,13 @@ suite('CLI environment and tool resolution', () => {
 		assert.ok(entries.includes('/c'));
 	});
 
+	test('XR_LANG follows the display language unless it is set', () => {
+		assert.strictEqual(cliEnvironment({ PATH: '' }, '', process.platform, 'zh-cn').XR_LANG, 'zh');
+		assert.strictEqual(cliEnvironment({ PATH: '' }, '', process.platform, 'en').XR_LANG, 'en');
+		assert.strictEqual(cliEnvironment({ PATH: '', XR_LANG: 'en' }, '', process.platform, 'zh-cn').XR_LANG, 'en');
+		assert.strictEqual(cliEnvironment({ PATH: '' }, '').XR_LANG, undefined);
+	});
+
 	test('pip user script directories are added to PATH', () => {
 		const base = process.platform === 'win32' ? 'C:\\u' : '/u';
 		const env = cliEnvironment({ PATH: '', PYTHONUSERBASE: base }, '');
@@ -333,6 +340,7 @@ suite('process helpers', () => {
 
 	test('failureMessage prefers the last stderr line that is not a warning', () => {
 		assert.strictEqual(failureMessage({ code: 1, stdout: '', stderr: 'warning: a\nboom\n', cancelled: false }, 'xrobot'), 'boom');
+		assert.strictEqual(failureMessage({ code: 1, stdout: '', stderr: '警告：a\n出错\n', cancelled: false }, 'xrobot'), '出错');
 		assert.strictEqual(failureMessage({ code: 2, stdout: '', stderr: '', cancelled: false }, 'xrobot'), 'xrobot exited with code 2');
 		assert.strictEqual(failureMessage({ code: null, stdout: '', stderr: '', cancelled: true }, 'xrobot'), 'xrobot was cancelled');
 	});

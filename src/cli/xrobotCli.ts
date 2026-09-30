@@ -105,12 +105,18 @@ export function resolveInvocation(tool: string, options: ResolveOptions): Invoca
 // puts console scripts there without adding them to PATH) and `xrobot.cli.extraPath`.
 // PYTHONIOENCODING=utf-8 makes Python write stdout/stderr as UTF-8 on every platform
 // (a Chinese Windows console code page is GBK); the output is decoded as UTF-8.
+// XR_LANG follows the VS Code display language unless the user set it, so the messages the
+// view shows are Chinese in a Chinese VS Code and English otherwise.
 export function cliEnvironment(
 	base: NodeJS.ProcessEnv,
 	extraPath: string,
 	platform: NodeJS.Platform = process.platform,
+	displayLanguage?: string,
 ): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = { ...base };
+	if (displayLanguage && !env.XR_LANG) {
+		env.XR_LANG = displayLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+	}
 	const key = pathKey(env);
 	const sep = platform === 'win32' ? ';' : ':';
 	const entries = [
