@@ -39,8 +39,8 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
 | Change | Command |
 | --- | --- |
 | add / remove an instance | `xrobot instance -c <config> add MODULE [--id ID]` / `remove ID` |
-| change one value | `xrobot instance -c <config> set ID PATH JSON --if-match <sha256>` |
-| switch an instance to another constructor | `xrobot instance -c <config> set ID args '<JSON list>' --if-match <sha256>` |
+| change one value | `xrobot instance -c <config> set --json ID PATH JSON --if-match <sha256>` |
+| switch an instance to another constructor | `xrobot instance -c <config> set --json ID args '<JSON list>' --if-match <sha256>` |
 | rename an instance (and its references) | `xrobot instance -c <config> rename ID NEW_ID` |
 | select the product | `xrobot gen -c <config>` |
 | add / remove a Module request | `xrobot module add owner/Repo[@ref]` / `module remove owner/Repo` |

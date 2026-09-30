@@ -9,7 +9,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [2.0.0]
 
 Requires XRobot 1.0 and its single `xrobot` command (including
-`instance set ID args <list>`); the pre-1.0 commands
+`instance set --json ID args <list>`); the pre-1.0 commands
 (`xrobot_setup`, `xrobot_gen_main`, `xrobot_add_mod`, `xrobot_src_man`, ...) are no
 longer called.
 
@@ -26,12 +26,13 @@ longer called.
   `.vscode/settings.json`.
 - Instances are added, changed, renamed and removed only with
   `xrobot instance add|set|rename|remove`. A value edit writes one node
-  (`args.<param>[.<field>|[n]]...`, `template_args[n]`) with `--if-match`, so a config
+  (`args.<param>[.<field>|[n]]...`, `template_args[n]`) as JSON (`--json`, strings
+  are C++ text) with `--if-match`, so a config
   that changed after the view read it is not overwritten. After a successful edit the
   header is regenerated with `xrobot gen` when `xrobot describe` reports no error.
 - Switching an instance to another constructor: the new argument list keeps the values
   of same-named parameters, gives new parameters their source default (marked in the
-  preview) and is written with one `xrobot instance set ID args <list> --if-match`.
+  preview) and is written with one `xrobot instance set --json ID args <list> --if-match`.
 - Module requests are added and removed with `xrobot module add|remove`; changing a
   request's ref removes it and adds `owner/Repo@ref` (restoring the old request if the
   add fails). Refs are listed from the repository that `xrobot source get` resolves.

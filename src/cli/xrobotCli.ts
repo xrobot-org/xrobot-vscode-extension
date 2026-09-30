@@ -180,9 +180,9 @@ export const xrobotArgs = {
 	instanceAdd: (root: string, config: string, module: string, id?: string): string[] => [
 		'-C', root, 'instance', '-c', config, 'add', module, ...(id ? ['--id', id] : []),
 	],
-	// `value` is serialized as JSON: the CLI parses the argument with json.loads.
+	// `value` is passed as JSON (`--json`): its strings are C++ text, as `xrobot describe` reports them.
 	instanceSet: (root: string, config: string, id: string, valuePath: string, value: unknown, ifMatch?: string): string[] => [
-		'-C', root, 'instance', '-c', config, 'set', id, valuePath, JSON.stringify(value), ...(ifMatch ? ['--if-match', ifMatch] : []),
+		'-C', root, 'instance', '-c', config, 'set', '--json', id, valuePath, JSON.stringify(value), ...(ifMatch ? ['--if-match', ifMatch] : []),
 	],
 	instanceRemove: (root: string, config: string, id: string): string[] => ['-C', root, 'instance', '-c', config, 'remove', id],
 	instanceRename: (root: string, config: string, id: string, newId: string): string[] => [

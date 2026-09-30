@@ -73,7 +73,7 @@ suite('xrobot argument builders', () => {
 			'-C', root, 'instance', '-c', config, 'add', 'xrobot-org/BlinkLED', '--id', 'led',
 		]);
 		assert.deepStrictEqual(xrobotArgs.instanceSet(root, config, 'led', 'args.name', '"闪烁 a"', 'f'.repeat(64)), [
-			'-C', root, 'instance', '-c', config, 'set', 'led', 'args.name', '"\\"闪烁 a\\""', '--if-match', 'f'.repeat(64),
+			'-C', root, 'instance', '-c', config, 'set', '--json', 'led', 'args.name', '"\\"闪烁 a\\""', '--if-match', 'f'.repeat(64),
 		]);
 		assert.deepStrictEqual(xrobotArgs.instanceSet(root, config, 'm', 'args.param', { reverse: 'true' }).slice(-1), ['{"reverse":"true"}']);
 		assert.deepStrictEqual(xrobotArgs.instanceRemove(root, config, 'led'), ['-C', root, 'instance', '-c', config, 'remove', 'led']);
@@ -111,7 +111,7 @@ suite('xrobot argument builders', () => {
 	test('constructor switch: the whole list is one JSON element for PATH args', () => {
 		const list = [{ led: 'LED_B' }, { frequency_hz: '2.0f' }];
 		assert.deepStrictEqual(xrobotArgs.instanceSet(root, config, 'led', valuePath('args', []), list, 'a'.repeat(64)), [
-			'-C', root, 'instance', '-c', config, 'set', 'led', 'args', '[{"led":"LED_B"},{"frequency_hz":"2.0f"}]', '--if-match', 'a'.repeat(64),
+			'-C', root, 'instance', '-c', config, 'set', '--json', 'led', 'args', '[{"led":"LED_B"},{"frequency_hz":"2.0f"}]', '--if-match', 'a'.repeat(64),
 		]);
 	});
 
@@ -234,7 +234,7 @@ suite('running the CLI (fake xrobot)', () => {
 		assert.ok(outcome.ok, outcome.message);
 		const recorded = JSON.parse(fs.readFileSync(log, 'utf8'));
 		const at = recorded.args.indexOf('args');
-		assert.deepStrictEqual(recorded.args.slice(at - 2, at), ['set', 'blink']);
+		assert.deepStrictEqual(recorded.args.slice(at - 3, at), ['set', '--json', 'blink']);
 		assert.deepStrictEqual(JSON.parse(recorded.args[at + 1]), list);
 		assert.deepStrictEqual(recorded.args.slice(at + 2), ['--if-match', 'b'.repeat(64)]);
 	});

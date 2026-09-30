@@ -34,7 +34,7 @@ export type InstanceEditTarget =
 	| { kind: 'arg'; name: string; path?: PathSegment[] }
 	| { kind: 'constructor' };
 
-// One CLI write: `xrobot instance set ID PATH JSON` or `xrobot instance rename ID NEW_ID`.
+// One CLI write: `xrobot instance set --json ID PATH JSON` or `xrobot instance rename ID NEW_ID`.
 // A constructor switch is a set of PATH `args` (the whole list); `added` names the
 // parameters that got their default.
 export type InstanceEdit =
