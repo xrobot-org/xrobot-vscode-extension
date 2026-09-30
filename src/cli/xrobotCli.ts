@@ -204,11 +204,14 @@ export const xrobotArgs = {
 		for (const declaration of options.templateParameters) {
 			args.push('--template', declaration);
 		}
+		for (const value of options.templateArguments ?? []) {
+			args.push('--template-arg', value);
+		}
 		for (const include of options.includes ?? []) {
 			args.push('--include', include);
 		}
-		if (options.depends.length > 0) {
-			args.push('--depends', ...options.depends);
+		for (const request of options.depends) {
+			args.push('--depends', request);
 		}
 		args.push('--out', options.outDir);
 		return args;
@@ -221,6 +224,8 @@ export type NewModuleOptions = {
 	description: string;
 	constructorParameters: string[];
 	templateParameters: string[];
+	// Template arguments the Module CI compiles the constructor probe with.
+	templateArguments?: string[];
 	includes?: string[];
 	depends: string[];
 	outDir: string;

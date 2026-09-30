@@ -42,6 +42,9 @@ longer called.
 - Tree actions: `xrobot setup`, `setup --frozen`, `setup --update`, `gen`,
   `format --check`, `format`, `new-module`; `xrobot init` in folders without
   `Modules/modules.yaml`.
+- The Create Module wizard passes each dependency with its own `--depends` and, for a
+  Module with template parameters, asks for the template arguments the Module CI
+  compiles with (`--template-arg`).
 - CLIs are started without a shell after a PATH lookup (PATH, pip per-user script
   directories, `xrobot.cli.extraPath`). When a console script is missing, its Python
   module runs from the extension directory without importing Python code from the

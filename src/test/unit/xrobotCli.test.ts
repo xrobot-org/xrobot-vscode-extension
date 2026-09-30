@@ -97,13 +97,15 @@ suite('xrobot argument builders', () => {
 				description: 'blinks',
 				constructorParameters: ['LibXR::GPIO& led', 'uint32_t cycle = 250'],
 				templateParameters: ['typename T'],
-				depends: ['a/B'],
+				templateArguments: ['float'],
+				depends: ['a/B', 'c/D@v1'],
 				outDir: path.join(root, 'out dir'),
 			}),
 			[
 				'new-module', 'Blink', '--desc', 'blinks',
 				'--constructor', 'LibXR::GPIO& led', '--constructor', 'uint32_t cycle = 250',
-				'--template', 'typename T', '--depends', 'a/B', '--out', path.join(root, 'out dir'),
+				'--template', 'typename T', '--template-arg', 'float',
+				'--depends', 'a/B', '--depends', 'c/D@v1', '--out', path.join(root, 'out dir'),
 			],
 		);
 	});

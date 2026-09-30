@@ -607,6 +607,17 @@ export async function createModuleWizard(): Promise<void> {
 	if (templateText === undefined) {
 		return;
 	}
+	// The Module CI compiles one constructor call, so a template parameter without a
+	// default needs a value there.
+	const templateArgumentText = templateText.trim()
+		? await vscode.window.showInputBox({
+				prompt: 'Template arguments the Module CI compiles with (C++, separated by ";"; parameters with defaults may be left out)',
+				placeHolder: 'Mecanum',
+			})
+		: '';
+	if (templateArgumentText === undefined) {
+		return;
+	}
 	const dependsText = await vscode.window.showInputBox({
 		prompt: 'Module dependencies (owner/Repo[@ref], space-separated, optional)',
 		validateInput: (value) =>
@@ -639,6 +650,7 @@ export async function createModuleWizard(): Promise<void> {
 			description: description.trim(),
 			constructorParameters: split(constructorText),
 			templateParameters: split(templateText),
+			templateArguments: split(templateArgumentText),
 			depends: dependsText.trim() ? dependsText.trim().split(/\s+/) : [],
 			outDir,
 		}),
