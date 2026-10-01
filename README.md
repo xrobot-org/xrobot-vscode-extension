@@ -95,9 +95,10 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
 
 ## LibXR view
 
-STM32 projects (a `*.ioc` in the workspace root): `xr_cubemx_cfg`, `xr_parse_ioc`,
-`xr_gen_code_stm32`, `xr_stm32_flash`, the flash layout, and editing of
-`User/libxr_config.yaml` values (followed by `xr_gen_code_stm32`).
+STM32 projects (a `*.ioc` in the workspace root): `libxr stm32 setup`, `libxr parse`,
+`libxr gen`, `libxr stm32 flash-info`, the flash layout, and editing of
+`User/libxr_config.yaml` values (followed by `libxr gen`). The actions need libxr 6.0.0 or
+later, which has the single `libxr` command.
 
 ## Settings
 

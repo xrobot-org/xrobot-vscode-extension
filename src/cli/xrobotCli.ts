@@ -23,14 +23,8 @@ export type Invocation = {
 // an interpreter whose Scripts/bin directory is not on PATH).
 export const PYTHON_MODULES: Record<string, string> = {
 	xrobot: 'xrobot.cli',
-	xr_cubemx_cfg: 'libxr.config_cubemx_project',
-	xr_gen_code: 'libxr.generator_code',
-	xr_gen_code_stm32: 'libxr.generator_code_stm32',
-	xr_parse: 'libxr.peripheral_analyzer',
-	xr_parse_ioc: 'libxr.peripheral_analyzer_stm32',
-	xr_stm32_cmake: 'libxr.generator_stm32_cmake',
-	xr_stm32_flash: 'libxr.stm32_flash_generator',
-	xr_stm32_toolchain_switch: 'libxr.stm32_toolchain_switch',
+	// The package runs its __main__ (libxr 6.0.0 or later).
+	libxr: 'libxr',
 };
 
 // Started with the extension directory as working directory: `python -c` puts the

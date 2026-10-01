@@ -28,7 +28,7 @@ import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
 
 export type CliRunRequest = {
 	label: string;
-	// Console script name (`xrobot`, `xr_parse_ioc`, ...).
+	// Console script name (`xrobot` or `libxr`); subcommands go into args.
 	tool: string;
 	args?: string[];
 	promptInput?: boolean;
@@ -178,10 +178,10 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 				groupNode(
 					'Actions',
 					[
-						actionNode('Configure CubeMX (xr_cubemx_cfg)', {
-							label: 'xr_cubemx_cfg',
-							tool: 'xr_cubemx_cfg',
-							args: ['-d', '.'],
+						actionNode('Configure CubeMX (libxr stm32 setup)', {
+							label: 'libxr stm32 setup',
+							tool: 'libxr',
+							args: ['stm32', 'setup', '-d', '.'],
 						}),
 					],
 					false,
@@ -298,37 +298,38 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		const flashModel = this.readFlashModel(ctx) ?? 'STM32F103C8';
 		const nodes: TreeNode[] = [];
 		const withXrobot = ctx.xrobotBsp;
+		const xrobotFlag = withXrobot ? ' --xrobot' : '';
+		const projectDir = iocDir === '' ? '.' : iocDir;
 
 		if (ctx.platform === 'stm32') {
 			nodes.push(
-				actionNode('Configure CubeMX (xr_cubemx_cfg)', {
-					label: 'xr_cubemx_cfg',
-					tool: 'xr_cubemx_cfg',
-					args: withXrobot ? ['-d', '.', '--xrobot'] : ['-d', '.'],
+				actionNode('Configure CubeMX (libxr stm32 setup)', {
+					label: 'libxr stm32 setup',
+					tool: 'libxr',
+					args: withXrobot ? ['stm32', 'setup', '-d', '.', '--xrobot'] : ['stm32', 'setup', '-d', '.'],
 				}),
 			);
 			nodes.push(
-				actionNode('Parse IOC (xr_parse_ioc)', {
-					label: 'xr_parse_ioc',
-					tool: 'xr_parse_ioc',
+				actionNode('Parse IOC (libxr parse)', {
+					label: 'libxr parse',
+					tool: 'libxr',
+					args: ['parse'],
 					promptInput: true,
 					defaultInput: `-d ${iocDir === '' ? '.' : iocDir} -o ${parseIocOut} --verbose`,
 					inputPrompt: `Example: -d <CubeMXDir> -o ${parseIocOut} --verbose`,
 				}),
-				actionNode('Generate STM32 Code (xr_gen_code_stm32)', {
-					label: 'xr_gen_code_stm32',
-					tool: 'xr_gen_code_stm32',
+				actionNode('Generate STM32 Code (libxr gen)', {
+					label: 'libxr gen',
+					tool: 'libxr',
+					args: ['gen'],
 					promptInput: true,
-					defaultInput: withXrobot
-						? `-i ${parseIocOut} -o ${appMainArg} --xrobot --libxr-config ${libxrConfigArg}`
-						: `-i ${parseIocOut} -o ${appMainArg} --libxr-config ${libxrConfigArg}`,
-					inputPrompt: withXrobot
-						? `Example: -i ${parseIocOut} -o ${appMainArg} --xrobot --libxr-config ${libxrConfigArg}`
-						: `Example: -i ${parseIocOut} -o ${appMainArg} --libxr-config ${libxrConfigArg}`,
+					defaultInput: `-i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
+					inputPrompt: `Example: -i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
 				}),
-				actionNode('Show STM32 Flash Info (xr_stm32_flash)', {
-					label: 'xr_stm32_flash',
-					tool: 'xr_stm32_flash',
+				actionNode('Show STM32 Flash Info (libxr stm32 flash-info)', {
+					label: 'libxr stm32 flash-info',
+					tool: 'libxr',
+					args: ['stm32', 'flash-info'],
 					promptInput: true,
 					defaultInput: flashModel,
 					inputPrompt: 'Example: STM32F103C8',
@@ -1146,11 +1147,9 @@ async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 	const libxrConfigRel = getWorkspaceRelativeConfig('xrobot.libxr.configPath', 'User/libxr_config.yaml').replace(/\\/g, '/');
 	const appMainArg = `./${appMainRel.replace(/^\.?\//, '')}`;
 	const libxrConfigArg = `./${libxrConfigRel.replace(/^\.?\//, '')}`;
-	const args = ['-i', stm32ParsedConfigArg(), '-o', appMainArg, '--libxr-config', libxrConfigArg];
-	if (isXrobotBsp(root)) {
-		args.splice(4, 0, '--xrobot');
-	}
-	await runCli({ label: 'xr_gen_code_stm32', tool: 'xr_gen_code_stm32', args });
+	const xrobot = isXrobotBsp(root) ? ['--xrobot'] : [];
+	const args = ['gen', '-i', stm32ParsedConfigArg(), '-o', appMainArg, ...xrobot, '--libxr-config', libxrConfigArg];
+	await runCli({ label: 'libxr gen', tool: 'libxr', args });
 }
 
 // Runs a tree action with the output channel revealed; a failure is reported with the

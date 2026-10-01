@@ -705,10 +705,10 @@ export async function checkDependencies(extensionDir: string): Promise<void> {
 		problems.push(`xrobot CLI unavailable: ${version.message ?? 'unknown error'} (pip install xrobot)`);
 	}
 	if (detectIocFiles(root).length > 0) {
-		const libxr = invocationFor('xr_parse_ioc', root, env);
+		const libxr = invocationFor('libxr', root, env);
 		const available = libxr && (libxr.prefix.length === 0 || (await pythonHasModule(libxr.command, 'libxr', extensionDir)));
 		if (!available) {
-			notes.push('LibXR CLIs not found; the LibXR view actions need `pip install libxr`');
+			notes.push('libxr CLI not found; the LibXR view actions need `pip install -U libxr` (6.0.0 or later)');
 		}
 	}
 	for (const note of notes) {

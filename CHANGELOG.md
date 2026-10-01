@@ -11,7 +11,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 Requires XRobot 1.0 and its single `xrobot` command (including
 `instance set --json ID args <list>`); the pre-1.0 commands
 (`xrobot_setup`, `xrobot_gen_main`, `xrobot_add_mod`, `xrobot_src_man`, ...) are no
-longer called.
+longer called. The LibXR view requires libxr 6.0.0 and its single `libxr` command
+(`libxr parse`, `libxr gen`, `libxr stm32 setup`, `libxr stm32 flash-info`) instead of
+the `xr_*` commands.
 
 ### Changed
 
