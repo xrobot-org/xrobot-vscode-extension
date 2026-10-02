@@ -14,7 +14,6 @@ export type DescribeHeader = {
 	path: string;
 	status: 'fresh' | 'stale' | 'missing' | 'unreadable' | string;
 	config: string | null;
-	newer: string[];
 	missing: string[];
 };
 
@@ -136,7 +135,6 @@ export function parseDescribeOutput(stdout: string): { ok: true; value: Describe
 	const value = parsed as DescribeResult;
 	value.configs = asArray<string>(value.configs);
 	value.selected = typeof value.selected === 'string' ? value.selected : value.config;
-	value.header.newer = asArray<string>(value.header.newer);
 	value.header.missing = asArray<string>(value.header.missing);
 	value.tools = isRecord(value.tools) && isRecord(value.tools.xrobot) ? value.tools : { xrobot: { installed: '?', pin: null } };
 	value.lock.modules = asArray<DescribeLockModule>(value.lock.modules);

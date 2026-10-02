@@ -16,8 +16,8 @@ A folder is treated as an XRobot BSP when it contains `Modules/modules.yaml`
 
 ## XRobot view
 
-- **Status**: the generated header `User/xrobot_main.hpp` (fresh, stale with the
-  newer or missing inputs, missing), the installed and pinned XRobot version, the
+- **Status**: the generated header `User/xrobot_main.hpp` (fresh, stale with any
+  missing inputs, missing), the installed and pinned XRobot version, the
   `xrobot.lock` state per Module, the entry source and its `XR_REGISTER`
   registrations, and every diagnostic `xrobot describe` reports.
 - **Products**: all application configs under `User/`. The selected product is the

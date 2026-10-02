@@ -421,10 +421,9 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private buildStatus(root: string, describe: DescribeResult): TreeNode[] {
 		const nodes: TreeNode[] = [];
 		const header = describe.header;
-		const headerChildren: TreeNode[] = [
-			...header.newer.map((p) => messageNode(`newer: ${p}`, undefined, { iconId: 'warning' })),
-			...header.missing.map((p) => messageNode(`missing: ${p}`, undefined, { iconId: 'error' })),
-		];
+		const headerChildren: TreeNode[] = header.missing.map((p) =>
+			messageNode(`missing: ${p}`, undefined, { iconId: 'error' }),
+		);
 		const headerLabel = `Header: ${header.status}`;
 		const headerDescription = header.config ? `${header.path} for ${header.config}` : header.path;
 		nodes.push(
