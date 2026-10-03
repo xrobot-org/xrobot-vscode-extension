@@ -21,6 +21,7 @@ import {
 	type ValueTree,
 } from './describeModel';
 import { readModuleRequests, readSources } from './workspaceFiles';
+import { flashMapSize, formatAddress, formatBytes, formatRun, readFlashMap, type FlashMap } from './flashMap';
 import { canSwitchConstructor, type InstanceEditTarget } from './instanceEditor';
 import { xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
@@ -225,61 +226,41 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return messageNode(`System: ${String(system)}`);
 	}
 
+	// `libxr gen` writes the internal Flash layout to flash_map.hpp next to app_main.cpp.
+	private flashMapPath(ctx: WorkspaceContext): { abs: string; rel: string } {
+		const abs = path.join(path.dirname(ctx.appMainAbs), 'flash_map.hpp');
+		return { abs, rel: path.relative(ctx.root, abs).replace(/\\/g, '/') };
+	}
+
+	private readFlashMap(ctx: WorkspaceContext): FlashMap | undefined {
+		return readFlashMap(this.flashMapPath(ctx).abs);
+	}
+
 	private buildFlashLayoutSummary(ctx: WorkspaceContext): string | undefined {
-		const rootObj = this.readLibxrConfigRoot(ctx);
-		if (!rootObj) {
+		const map = this.readFlashMap(ctx);
+		if (!map || map.runs.length === 0) {
 			return undefined;
 		}
-		const flash = asRecord(rootObj.FlashLayout);
-		if (!flash) {
-			return undefined;
-		}
-		const model = flash.model !== undefined ? String(flash.model) : undefined;
-		const size = flash.flash_size_kb !== undefined ? String(flash.flash_size_kb) : undefined;
-		if (model && size) {
-			return `${model} ${size}KB`;
-		}
-		return model ?? (size ? `${size}KB` : undefined);
+		const size = formatBytes(flashMapSize(map));
+		return map.mcu ? `${map.mcu} ${size}` : size;
 	}
 
 	private buildFlashLayoutNodes(ctx: WorkspaceContext): TreeNode[] {
-		const rootObj = this.readLibxrConfigRoot(ctx);
-		if (!rootObj) {
-			return [messageNode(`${ctx.libxrConfigRel} (missing or invalid)`)];
+		const file = this.flashMapPath(ctx);
+		const map = this.readFlashMap(ctx);
+		if (!map) {
+			return [messageNode(`${file.rel} (missing or invalid; run libxr gen)`)];
 		}
-		const flash = asRecord(rootObj.FlashLayout);
-		if (!flash) {
-			return [messageNode('(missing) FlashLayout')];
+		if (map.runs.length === 0) {
+			return [messageNode(`${file.rel} (no Flash regions)`)];
 		}
-
-		const model = flash.model !== undefined ? String(flash.model) : 'unknown';
-		const base = flash.flash_base !== undefined ? String(flash.flash_base) : 'unknown';
-		const size = flash.flash_size_kb !== undefined ? String(flash.flash_size_kb) : 'unknown';
-		const nodes: TreeNode[] = [
-			messageNode(`Model: ${model}`),
-			messageNode(`Base: ${base}`),
-			messageNode(`Size: ${size} KB`),
+		return [
+			messageNode(`Model: ${map.mcu ?? 'unknown'}`),
+			messageNode(`Base: ${formatAddress(map.runs[0].address)}`),
+			messageNode(`Size: ${formatBytes(flashMapSize(map))}`),
+			groupNode('Sectors', map.runs.map((run) => messageNode(formatRun(run))), false),
+			fileNode('Flash Map', file.abs, file.rel, 'none', { description: file.rel }),
 		];
-
-		const sectors = Array.isArray(flash.sectors) ? flash.sectors : [];
-		if (sectors.length === 0) {
-			nodes.push(messageNode('(empty) sectors'));
-			return nodes;
-		}
-
-		const sectorNodes: TreeNode[] = [];
-		for (const raw of sectors) {
-			const s = asRecord(raw);
-			if (!s) {
-				continue;
-			}
-			const idx = s.index !== undefined ? String(s.index) : '?';
-			const addr = s.address !== undefined ? String(s.address) : '?';
-			const sizeKb = s.size_kb !== undefined ? String(s.size_kb) : '?';
-			sectorNodes.push(messageNode(`S${idx}: ${addr} (${sizeKb} KB)`));
-		}
-		nodes.push(groupNode('Sectors', sectorNodes.length > 0 ? sectorNodes : [messageNode('(empty) sectors')], false));
-		return nodes;
 	}
 
 	private readLibxrConfigRoot(ctx: WorkspaceContext): Record<string, unknown> | undefined {
@@ -344,15 +325,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	}
 
 	private readFlashModel(ctx: WorkspaceContext): string | undefined {
-		const rootObj = this.readLibxrConfigRoot(ctx);
-		if (!rootObj) {
-			return undefined;
-		}
-		const flash = asRecord(rootObj.FlashLayout);
-		if (!flash || flash.model === undefined) {
-			return undefined;
-		}
-		return String(flash.model);
+		return this.readFlashMap(ctx)?.mcu;
 	}
 }
 

@@ -58,6 +58,9 @@ the `xr_*` commands.
   present). It checks `git` and `xrobot`, and LibXR only when a `*.ioc` file is present.
 - In untrusted workspaces the workspace values of `xrobot.cli.extraPath` and
   `xrobot.cli.pythonPath` are ignored.
+- The LibXR view reads the Flash layout (MCU and runs of equal sectors) from
+  `flash_map.hpp` next to `app_main.cpp`, as libxr 6.0.0 no longer writes a
+  `FlashLayout` section to `libxr_config.yaml`; `libxr stm32 flash-info` uses that MCU.
 
 ### Fixed
 
