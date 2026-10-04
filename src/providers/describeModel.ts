@@ -1,4 +1,4 @@
-// Pure model of `xrobot describe` output (schema 1, XRobot 1.0) plus value helpers used
+// Pure model of `xrobot describe` output (schema 1, xrobot 1.0) plus value helpers used
 // by the XRobot view and the instance editor. Nothing here parses C++ or manifests:
 // every interface fact comes from `xrobot describe`. No `vscode` import (unit-tested).
 

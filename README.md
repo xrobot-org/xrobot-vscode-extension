@@ -35,20 +35,20 @@ Install "XRobot" from the VS Code Marketplace, or download the `.vsix` file from
 [Releases](https://github.com/xrobot-org/xrobot-vscode-extension/releases) and use
 "Install from VSIX".
 
-扩展调用以下命令行工具，其安装方法见各自的 README：XRobot 视图需要 XRobot 1.0（`xrobot` 命令）和
+扩展调用以下命令行工具，其安装方法见各自的 README：XRobot 视图需要 xrobot 1.0（`xrobot` 命令）和
 `git`，LibXR 视图需要 libxr 6.0.0（`libxr` 命令）。扩展在 `PATH`、pip 的用户脚本目录以及设置项
 `xrobot.cli.extraPath` 中查找这些命令。
 
 The extension calls these command-line tools, installed as their READMEs describe: the XRobot view
-needs XRobot 1.0 (the `xrobot` command) and `git`, the LibXR view needs libxr 6.0.0 (the `libxr`
+needs xrobot 1.0 (the `xrobot` command) and `git`, the LibXR view needs libxr 6.0.0 (the `libxr`
 command). The commands are looked up on `PATH`, in pip's per-user script directories and in the
 `xrobot.cli.extraPath` setting.
 
-扩展 2.0.0 用于 XRobot 1.0 的 BSP。命令行工具仍是 xrobot 0.3.1 时，先将 `xrobot` 和 `libxr` 升级到上述版本
+扩展 2.0.0 用于 xrobot 1.0 的 BSP。命令行工具仍是 xrobot 0.3.1 时，先将 `xrobot` 和 `libxr` 升级到上述版本
 并迁移 BSP。暂时还要打开 0.x 的 BSP 时，在扩展页面的齿轮菜单中通过 “Install Specific Version...” 安装 1.0.1，
 并关闭本扩展的 “Auto Update”；VS Code 默认自动更新扩展，2.0.0 发布后会替换 1.0.1。
 
-Extension 2.0.0 works with XRobot 1.0 BSPs. If the command-line tools are still xrobot 0.3.1,
+Extension 2.0.0 works with xrobot 1.0 BSPs. If the command-line tools are still xrobot 0.3.1,
 first upgrade `xrobot` and `libxr` to the versions above and migrate the BSP. To keep opening
 0.x BSPs for a while, install 1.0.1 with "Install Specific Version..." in the gear menu of the
 extension page and turn off "Auto Update" for this extension; VS Code updates extensions

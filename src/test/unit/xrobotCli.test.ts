@@ -36,7 +36,7 @@ if (args.includes('describe')) {
 		setTimeout(() => process.stdout.write(bytes.subarray(cut)), 50);
 	});
 } else if (args.includes('fail')) {
-	process.stderr.write('warning: installed XRobot 1.0.0 differs from the pinned 0.9\n');
+	process.stderr.write('warning: installed xrobot 1.0.0 differs from the pinned 0.9\n');
 	process.stderr.write('User/xrobot.yaml: led: named arguments do not match a constructor\n');
 	process.exitCode = 1;
 } else {
@@ -286,7 +286,7 @@ suite('running the CLI (fake xrobot)', () => {
 		assert.strictEqual(unresolved.ok, false);
 		assert.strictEqual(unresolved.found, false);
 		assert.match(unresolved.message ?? '', /xrobot was not found/);
-		// Without -U, pip keeps an installed XRobot 0.x.
+		// Without -U, pip keeps an installed xrobot 0.x.
 		assert.match(unresolved.message ?? '', /pip install -U xrobot/);
 		const missing = await startInvocation({ ...invocation, command: path.join(dir, 'no such xrobot') }, 'xrobot', [], env()).done;
 		assert.strictEqual(missing.ok, false);
