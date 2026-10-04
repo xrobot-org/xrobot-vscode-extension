@@ -407,7 +407,7 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		const tool = describe.tools.xrobot;
 		nodes.push(
-			messageNode(`XRobot ${tool.installed}`, tool.pin ? `pinned ${tool.pin}` : 'not pinned', {
+			messageNode(`xrobot ${tool.installed}`, tool.pin ? `pinned ${tool.pin}` : 'not pinned', {
 				iconId: tool.pin === tool.installed ? 'pass' : 'warning',
 			}),
 		);

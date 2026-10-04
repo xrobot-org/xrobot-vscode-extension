@@ -693,8 +693,8 @@ export async function checkDependencies(extensionDir: string): Promise<void> {
 		const invocation = invocationFor('xrobot', root, env);
 		notes.push(`${version.stdout.trim()} (${invocation?.display ?? 'xrobot'})`);
 	} else {
-		// `pip install` without -U keeps an installed XRobot 0.x, which has no xrobot.cli.
-		problems.push(`xrobot CLI unavailable: ${version.message ?? 'unknown error'} (XRobot 1.0 or later: pip install -U xrobot)`);
+		// `pip install` without -U keeps an installed xrobot 0.x, which has no xrobot.cli.
+		problems.push(`xrobot CLI unavailable: ${version.message ?? 'unknown error'} (xrobot 1.0 or later: pip install -U xrobot)`);
 	}
 	if (detectIocFiles(root).length > 0) {
 		const libxr = invocationFor('libxr', root, env);

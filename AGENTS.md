@@ -1,7 +1,7 @@
 # XRobot VS Code Extension Agent Notes
 
 ## Goal
-A VS Code sidebar for XRobot 1.0 BSPs and the LibXR STM32 generator:
+A VS Code sidebar for xrobot 1.0 BSPs and the LibXR STM32 generator:
 - Activity Bar container `xrobot`, tree views `xrobot.libxrView` and `xrobot.xrobotView`.
 - The XRobot view is a UI over the `xrobot` CLI (`describe`, `instance`, `gen`, `setup`, `format`,
   `module`, `source`, `new-module`, `init`). It never parses C++ or Module manifests.

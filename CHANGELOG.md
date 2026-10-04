@@ -1,8 +1,8 @@
 # Change Log
 
-## [2.0.0]
+## [2.0.0] - 2026-10-04
 
-Requires XRobot 1.0 and its single `xrobot` command (including
+Requires xrobot 1.0 and its single `xrobot` command (including
 `instance set --json ID args <list>`); the pre-1.0 commands
 (`xrobot_setup`, `xrobot_gen_main`, `xrobot_add_mod`, `xrobot_src_man`, ...) are no
 longer called. The LibXR view requires libxr 6.0.0 and its single `libxr` command
@@ -79,7 +79,7 @@ the `xr_*` commands.
 - The LibXR Hardware Container (`device_aliases`) editor, the Module manifest editor and
   all header manifest parsing.
 - `Edit Repo Name` (remove the request and add another) and `Edit Source Mirror`
-  (XRobot 1.0 `sources.yaml` entries have no mirror field).
+  (xrobot 1.0 `sources.yaml` entries have no mirror field).
 - Editing `settings` of the XRobot config from the view.
 
 ### Added

@@ -1,4 +1,4 @@
-// Adapter for the `xrobot` CLI (XRobot 1.0) and the LibXR console scripts.
+// Adapter for the `xrobot` CLI (xrobot 1.0) and the LibXR console scripts.
 // No `vscode` import: argument building, tool resolution, decoding and exit-code handling
 // are unit-tested with a fake executable.
 //
