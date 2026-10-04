@@ -3,19 +3,22 @@
   "publisher": "XRobot",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
-  "version": "0.0.9",
+  "version": "2.0.0",
   "icon": "media/xrobot.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/xrobot-org/xrobot-vscode-extension"
   },
-  "homepage": "https://xrobot-org.github.io/",
+  "homepage": "https://xrobot.work/",
   "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.108.0"
   },
   "categories": [
     "Other"
+  ],
+  "extensionKind": [
+    "workspace"
   ],
   "activationEvents": [
     "onCommand:xrobot.helloWorld",
@@ -24,7 +27,12 @@
   ],
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "In an untrusted workspace the workspace's own values of xrobot.cli.extraPath and xrobot.cli.pythonPath are ignored, so the workspace cannot choose which programs the extension starts.",
+      "restrictedConfigurations": [
+        "xrobot.cli.extraPath",
+        "xrobot.cli.pythonPath"
+      ]
     }
   },
   "main": "./out/extension.js",
@@ -84,8 +92,8 @@
         "title": "XRobot: Pick LibXR App Main Path"
       },
       {
-        "command": "xrobot.pickXrobotConfigPath",
-        "title": "XRobot: Pick XRobot Config Path"
+        "command": "xrobot.selectProduct",
+        "title": "XRobot: Select Product (xrobot gen -c)"
       },
       {
         "command": "xrobot.editYamlScalar",
@@ -93,7 +101,7 @@
       },
       {
         "command": "xrobot.createModuleWizard",
-        "title": "XRobot: Create Module Wizard"
+        "title": "XRobot: Create Module (xrobot new-module)"
       },
       {
         "command": "xrobot.addModuleInstance",
@@ -109,19 +117,15 @@
       },
       {
         "command": "xrobot.addRepo",
-        "title": "XRobot: Add Repo"
-      },
-      {
-        "command": "xrobot.editRepoName",
-        "title": "XRobot: Edit Repo Name"
+        "title": "XRobot: Add Module Request"
       },
       {
         "command": "xrobot.editRepoVersion",
-        "title": "XRobot: Edit Repo Version"
+        "title": "XRobot: Change Module Request Ref"
       },
       {
         "command": "xrobot.deleteRepo",
-        "title": "XRobot: Delete Repo"
+        "title": "XRobot: Remove Module Request"
       },
       {
         "command": "xrobot.addSource",
@@ -136,27 +140,29 @@
         "title": "XRobot: Edit Source Priority"
       },
       {
-        "command": "xrobot.editSourceMirror",
-        "title": "XRobot: Edit Source Mirror"
-      },
-      {
         "command": "xrobot.deleteSource",
         "title": "XRobot: Delete Source"
-      },
-      {
-        "command": "xrobot.addHardwareAlias",
-        "title": "XRobot: Add Hardware Alias"
-      },
-      {
-        "command": "xrobot.editHardwareAlias",
-        "title": "XRobot: Edit Hardware Alias"
-      },
-      {
-        "command": "xrobot.deleteHardwareAlias",
-        "title": "XRobot: Delete Hardware Alias"
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "xrobot.runCli",
+          "when": "false"
+        },
+        {
+          "command": "xrobot.openFile",
+          "when": "false"
+        },
+        {
+          "command": "xrobot.openUrl",
+          "when": "false"
+        },
+        {
+          "command": "xrobot.editYamlScalar",
+          "when": "false"
+        }
+      ],
       "view/title": [
         {
           "command": "xrobot.collapseAllViews",
@@ -177,12 +183,6 @@
           "when": "view == xrobot.libxrView && viewItem == xrobot.libxr.appMainPath",
           "group": "inline",
           "icon": "$(edit)"
-        },
-        {
-          "command": "xrobot.pickXrobotConfigPath",
-          "when": "view == xrobot.xrobotView && viewItem == xrobot.xrobot.configPath",
-          "group": "inline",
-          "icon": "$(edit)"
         }
       ]
     },
@@ -192,12 +192,12 @@
         "xrobot.cli.extraPath": {
           "type": "string",
           "default": "",
-          "description": "Additional path appended to PATH when running XRobot/LibXR CLI commands."
+          "description": "Additional directories (PATH syntax) appended to PATH when looking up and running the xrobot/LibXR CLIs."
         },
         "xrobot.cli.pythonPath": {
           "type": "string",
           "default": "",
-          "description": "Python executable name or full path used for pip checks (e.g. python3.11). Leave empty to auto-detect."
+          "description": "Python interpreter (name or full path) used to run the xrobot/LibXR Python modules when their console scripts are not on PATH. Leave empty to search PATH."
         },
         "xrobot.libxr.iocFile": {
           "type": "string",
@@ -213,11 +213,6 @@
           "type": "string",
           "default": "User/app_main.cpp",
           "description": "Path to app_main.cpp relative to workspace root."
-        },
-        "xrobot.xrobot.configPath": {
-          "type": "string",
-          "default": "User/xrobot.yaml",
-          "description": "Current XRobot config file (searched under User/**/*.yml|yaml, excluding names containing libxr)."
         }
       }
     }
@@ -226,9 +221,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "pretest": "npm run compile",
+    "test": "mocha",
+    "test:vscode": "npm run compile && vscode-test",
+    "package": "vsce package"
   },
   "dependencies": {
     "yaml": "^2.5.0"
@@ -237,10 +234,11 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.108.0",
-    "@vscode/vsce": "2.24.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "2.24.0",
     "eslint": "^9.39.2",
+    "mocha": "^11.7.5",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0"
   },
