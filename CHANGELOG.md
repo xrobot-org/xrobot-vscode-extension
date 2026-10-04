@@ -1,11 +1,5 @@
 # Change Log
 
-All notable changes to the "xrobot" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
 ## [2.0.0]
 
 Requires XRobot 1.0 and its single `xrobot` command (including
