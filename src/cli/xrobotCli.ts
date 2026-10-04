@@ -231,6 +231,14 @@ export const xrobotArgs = {
 	version: (): string[] => ['--version'],
 };
 
+// `libxr` (CodeGenerator 6.0.0) runs in the workspace root, so its paths are relative to it.
+export const libxrArgs = {
+	parse: (projectDir: string, output: string): string[] => ['parse', '-d', projectDir, '-o', output],
+	gen: (input: string, output: string, libxrConfig: string, xrobot: boolean): string[] => [
+		'gen', '-i', input, '-o', output, ...(xrobot ? ['--xrobot'] : []), '--libxr-config', libxrConfig,
+	],
+};
+
 export type NewModuleOptions = {
 	name: string;
 	description: string;

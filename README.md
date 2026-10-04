@@ -178,7 +178,7 @@ bars.
 $ npm ci
 $ npm run compile
 $ npm test
-  46 passing (1s)
+  48 passing (2s)
   1 pending
 ```
 

@@ -11,6 +11,7 @@ import {
 	configHash,
 	findPython,
 	formatCommandLine,
+	libxrArgs,
 	pythonHasModule,
 	resolveInvocation,
 	startInvocation,
@@ -138,6 +139,20 @@ suite('xrobot argument builders', () => {
 
 	test('command lines are displayed with quoting', () => {
 		assert.strictEqual(formatCommandLine('xrobot', ['-C', 'a b', 'set', '"x"']), 'xrobot -C "a b" set "\\"x\\""');
+	});
+});
+
+suite('libxr argument builders', () => {
+	test('parse writes the .config.yaml that gen then reads', () => {
+		assert.deepStrictEqual(libxrArgs.parse('.', './.config.yaml'), ['parse', '-d', '.', '-o', './.config.yaml']);
+		assert.deepStrictEqual(
+			libxrArgs.gen('./.config.yaml', './User/app_main.cpp', './User/libxr_config.yaml', true),
+			['gen', '-i', './.config.yaml', '-o', './User/app_main.cpp', '--xrobot', '--libxr-config', './User/libxr_config.yaml'],
+		);
+		assert.deepStrictEqual(
+			libxrArgs.gen('./.config.yaml', './User/app_main.cpp', './User/libxr_config.yaml', false),
+			['gen', '-i', './.config.yaml', '-o', './User/app_main.cpp', '--libxr-config', './User/libxr_config.yaml'],
+		);
 	});
 });
 

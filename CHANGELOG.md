@@ -63,6 +63,9 @@ the `xr_*` commands.
   characters, and on Windows with a GBK code page Chinese text was garbled.
 - Commands started from the command palette without a target ask for one; `Delete Repo`
   used to remove the first request in `Modules/modules.yaml`.
+- After a value in `libxr_config.yaml` is edited in the LibXR view, `libxr parse` runs
+  before `libxr gen`; gen read `.config.yaml`, which Git ignores, and failed in a fresh
+  clone.
 - Sources were edited by their position in the priority-sorted list, which could change
   a different entry, including the official source.
 - Editing one value no longer rewrites the whole YAML file.
