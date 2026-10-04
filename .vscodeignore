@@ -7,7 +7,6 @@ out/test/**
 .gitignore
 .yarnrc
 .mocharc.json
-vsc-extension-quickstart.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md

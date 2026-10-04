@@ -23,7 +23,7 @@ import {
 import { readModuleRequests, readSources } from './workspaceFiles';
 import { flashMapSize, formatAddress, formatBytes, formatRun, readFlashMap, type FlashMap } from './flashMap';
 import { canSwitchConstructor, type InstanceEditTarget } from './instanceEditor';
-import { xrobotArgs, type PathSegment } from '../cli/xrobotCli';
+import { libxrArgs, xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
 
@@ -1110,18 +1110,32 @@ function normalizePath(p: string): string {
 	return path.resolve(p).toLowerCase();
 }
 
+// `libxr gen` reads the .config.yaml that `libxr parse` writes. That file is ignored by Git,
+// so a fresh clone has none and parse runs first.
 async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 	const root = getWorkspaceRoot();
 	if (!root) {
 		return;
 	}
+	const ioc = resolveIocFile(root, detectIocFiles(root));
+	const projectDir = ioc ? path.dirname(ioc).replace(/\\/g, '/') : '.';
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp').replace(/\\/g, '/');
 	const libxrConfigRel = getWorkspaceRelativeConfig('xrobot.libxr.configPath', 'User/libxr_config.yaml').replace(/\\/g, '/');
 	const appMainArg = `./${appMainRel.replace(/^\.?\//, '')}`;
 	const libxrConfigArg = `./${libxrConfigRel.replace(/^\.?\//, '')}`;
-	const xrobot = isXrobotBsp(root) ? ['--xrobot'] : [];
-	const args = ['gen', '-i', stm32ParsedConfigArg(), '-o', appMainArg, ...xrobot, '--libxr-config', libxrConfigArg];
-	await runCli({ label: 'libxr gen', tool: 'libxr', args });
+	const parsed = await runCli({
+		label: 'libxr parse',
+		tool: 'libxr',
+		args: libxrArgs.parse(projectDir, stm32ParsedConfigArg()),
+	});
+	if (!parsed) {
+		return;
+	}
+	await runCli({
+		label: 'libxr gen',
+		tool: 'libxr',
+		args: libxrArgs.gen(stm32ParsedConfigArg(), appMainArg, libxrConfigArg, isXrobotBsp(root)),
+	});
 }
 
 // Runs a tree action with the output channel revealed; a failure is reported with the
