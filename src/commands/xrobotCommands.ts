@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseLsRemote, type RemoteRefs } from '../cli/gitRefs';
 import { findExecutable, runProcess } from '../cli/process';
-import { isIdentifier, xrobotArgs } from '../cli/xrobotCli';
+import { isIdentifier, pythonHasModule, xrobotArgs } from '../cli/xrobotCli';
 import {
 	cliEnv,
 	configAbsolute,
@@ -677,15 +677,6 @@ export async function createModuleWizard(): Promise<void> {
 // ---------------------------------------------------------------------------------------
 // Startup check (XRobot BSPs only, asynchronous).
 
-async function pythonHasModule(python: string, module: string, cwd: string): Promise<boolean> {
-	const result = await runProcess(
-		python,
-		['-c', 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)', module],
-		{ cwd, env: cliEnv() },
-	).done;
-	return result.code === 0;
-}
-
 export async function checkDependencies(extensionDir: string): Promise<void> {
 	const root = getWorkspaceRoot();
 	if (!root || !isXrobotBsp(root)) {
@@ -702,11 +693,13 @@ export async function checkDependencies(extensionDir: string): Promise<void> {
 		const invocation = invocationFor('xrobot', root, env);
 		notes.push(`${version.stdout.trim()} (${invocation?.display ?? 'xrobot'})`);
 	} else {
-		problems.push(`xrobot CLI unavailable: ${version.message ?? 'unknown error'} (pip install xrobot)`);
+		// `pip install` without -U keeps an installed XRobot 0.x, which has no xrobot.cli.
+		problems.push(`xrobot CLI unavailable: ${version.message ?? 'unknown error'} (XRobot 1.0 or later: pip install -U xrobot)`);
 	}
 	if (detectIocFiles(root).length > 0) {
 		const libxr = invocationFor('libxr', root, env);
-		const available = libxr && (libxr.prefix.length === 0 || (await pythonHasModule(libxr.command, 'libxr', extensionDir)));
+		const available =
+			libxr && (libxr.prefix.length === 0 || (await pythonHasModule(libxr.command, 'libxr.__main__', extensionDir, env)));
 		if (!available) {
 			notes.push('libxr CLI not found; the LibXR view actions need `pip install -U libxr` (6.0.0 or later)');
 		}
