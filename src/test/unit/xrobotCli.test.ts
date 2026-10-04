@@ -11,6 +11,7 @@ import {
 	configHash,
 	findPython,
 	formatCommandLine,
+	pythonHasModule,
 	resolveInvocation,
 	startInvocation,
 	valuePath,
@@ -270,6 +271,8 @@ suite('running the CLI (fake xrobot)', () => {
 		assert.strictEqual(unresolved.ok, false);
 		assert.strictEqual(unresolved.found, false);
 		assert.match(unresolved.message ?? '', /xrobot was not found/);
+		// Without -U, pip keeps an installed XRobot 0.x.
+		assert.match(unresolved.message ?? '', /pip install -U xrobot/);
 		const missing = await startInvocation({ ...invocation, command: path.join(dir, 'no such xrobot') }, 'xrobot', [], env()).done;
 		assert.strictEqual(missing.ok, false);
 		assert.strictEqual(missing.found, false);
@@ -326,6 +329,36 @@ suite('Python fallback bootstrap', () => {
 			assert.strictEqual(fs.realpathSync(path.dirname(result.from)), fs.realpathSync(site));
 			assert.strictEqual(fs.realpathSync(result.cwd), fs.realpathSync(workspace));
 			assert.deepStrictEqual(result.argv, ['-C', workspace, 'describe', '"闪烁"']);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test('the libxr probe needs the package __main__ that only libxr 6.0.0 or later has', async function () {
+		// libxr 5.x also has a `libxr` package; finding the package used to pass the check,
+		// and the LibXR actions then failed with "'libxr' is a package and cannot be
+		// directly executed".
+		const python = findPython({ env: process.env });
+		if (!python) {
+			this.skip();
+			return;
+		}
+		const dir = tempDir('probe');
+		try {
+			for (const [name, files] of [
+				['fakelibxr_old', ['__init__.py']],
+				['fakelibxr_new', ['__init__.py', '__main__.py']],
+			] as const) {
+				fs.mkdirSync(path.join(dir, name));
+				for (const file of files) {
+					fs.writeFileSync(path.join(dir, name, file), '');
+				}
+			}
+			const env = cliEnvironment({ ...process.env, PYTHONPATH: dir }, '');
+			assert.strictEqual(await pythonHasModule(python, 'fakelibxr_old', dir, env), true);
+			assert.strictEqual(await pythonHasModule(python, 'fakelibxr_old.__main__', dir, env), false);
+			assert.strictEqual(await pythonHasModule(python, 'fakelibxr_new.__main__', dir, env), true);
+			assert.strictEqual(await pythonHasModule(python, 'fakelibxr_missing.__main__', dir, env), false);
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true });
 		}

@@ -95,6 +95,18 @@ export function resolveInvocation(tool: string, options: ResolveOptions): Invoca
 	return pythonInvocation(python, module, options.extensionDir, options.workspaceRoot);
 }
 
+// Whether `python` finds `module`; a dotted name imports its package first. The startup
+// check asks for `libxr.__main__`: libxr 5.x also has a `libxr` package, but only 6.0.0 or
+// later runs as `python -m libxr`.
+export async function pythonHasModule(python: string, module: string, cwd: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+	const result = await runProcess(
+		python,
+		['-c', 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)', module],
+		{ cwd, env },
+	).done;
+	return result.code === 0;
+}
+
 // CLI environment: PATH gains the pip per-user script directories (pip install --user
 // puts console scripts there without adding them to PATH) and `xrobot.cli.extraPath`.
 // PYTHONIOENCODING=utf-8 makes Python write stdout/stderr as UTF-8 on every platform
@@ -324,7 +336,7 @@ export function startInvocation(
 				cancelled: false,
 				found: false,
 				message: `${tool} was not found on PATH and no Python interpreter with its package was found; ` +
-					'install it (pip install ' + (tool === 'xrobot' ? 'xrobot' : 'libxr') + ') or set xrobot.cli.extraPath / xrobot.cli.pythonPath',
+					'install it (pip install -U ' + (tool === 'xrobot' ? 'xrobot' : 'libxr') + ') or set xrobot.cli.extraPath / xrobot.cli.pythonPath',
 			}),
 		};
 	}
