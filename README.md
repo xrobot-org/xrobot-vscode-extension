@@ -174,15 +174,17 @@ drawing and the inspector shows the pin, what the project uses it as and what el
 function, drawn solid for the pin in use and dashed for the other candidates; click a pin name to find it on the drawing.
 Selecting a peripheral in the panel (or clicking a pin the project uses) selects it in the sidebar too.
 
-The wheel zooms around the pointer, a drag pans and a double click shows the whole package again, as in CubeMX (in a narrow
-window, where the drawing sits above the inspector, the wheel scrolls the page and Ctrl+wheel zooms). The search box
-highlights matching pins; Enter goes to the next match, Shift+Enter to the previous, Escape clears. The arrow keys walk along the
-package once a pin is selected, and Escape clears the selection.
+The window is the chip: the drawing fills it, with the name, package and pin count written on the chip. The controls float
+over it: Search (a button that opens the field), Functions, Legend and Details, and the zoom in the bottom-right corner. The
+inspector (Details) opens beside the drawing when something is selected, and closes with Clear. The wheel zooms around the
+pointer, a drag pans and a double click shows the whole package again, as in CubeMX. Search highlights matching pins; Enter goes
+to the next match, Shift+Enter to the previous, Escape closes it. The arrow keys walk along the package once a pin is selected,
+and Escape clears the selection.
 
 In the drawing the selected pins are coloured by peripheral category and labelled with the pin name and the selected
 function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the top-left corner marks pin 1. The search
-box highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend filters by
-category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
+field highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend panel filters
+by category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
 it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). The
 package of an MSPM0 comes from its SysConfig project (the `--package` of the `.syscfg`, or the LaunchPad its `--board` names), so nothing is set; the `xrobot.libxr.package` setting only overrides it. The panel is read-only for now; an MSPM0 has no LibXR code generation (STM32 only), but the settings of
 its peripherals come from the `.syscfg` of the SysConfig project (baud rate, interrupts, ...) and are shown read-only under

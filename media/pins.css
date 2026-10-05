@@ -39,7 +39,7 @@ body {
 	--duration-base: 160ms;
 
 	margin: 0;
-	padding: 0 var(--space-4) var(--space-4);
+	padding: 0;
 	background: var(--paper);
 	color: var(--ink);
 	font-family: var(--font-sans);
@@ -105,31 +105,45 @@ input[type=search] {
 }
 input[type=search]::placeholder { color: var(--ink-muted); }
 
-/* ---- header ---- */
-.bar { padding: var(--space-4) 0 var(--space-2); }
-.bar header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); margin-top: var(--space-1); }
-.bar .subtitle { color: var(--ink-muted); }
-.bar .busy { color: var(--ink-muted); }
-.bar .tools { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-1); }
-.zoom { min-width: 4em; text-align: center; color: var(--ink-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.searchrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
-.count { min-width: 5em; color: var(--ink-muted); }
+/* ---- stage: the window is the chip; the controls float over it, the inspector opens beside it ---- */
+#app { height: 100vh; }
+#app > .loading, #app > .failure { margin: var(--space-4); }
+.stage { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.stage.with-side { grid-template-columns: minmax(0, 1fr) clamp(280px, 34%, 400px); }
+.view { position: relative; min-width: 0; min-height: 0; }
+.package { position: absolute; inset: 0; overflow: hidden; background: var(--paper-sunken); cursor: grab; touch-action: none; }
+.package.dragging { cursor: grabbing; }
+.package svg { display: block; user-select: none; }
+.stage > aside {
+	display: none; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--space-4);
+	flex-direction: column; gap: var(--space-4); background: var(--paper); border-left: var(--stroke) solid var(--line);
+}
+.stage.with-side > aside { display: flex; }
+.source { margin: var(--space-2) 0 0; font: 400 12px/16px var(--font-mono); color: var(--ink-muted); }
+@media (max-width: 640px) {
+	.stage.with-side { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 45vh; }
+	.stage > aside { border-left: 0; border-top: var(--stroke) solid var(--line); }
+}
 
-/* ---- legend: a tag per category, its colour a swatch of the data colour; on = inverted ---- */
-.legend { margin: var(--space-2) 0; }
-/* closed, the legend is one quiet line: its name and the colours; the tags show when it is open */
-details > summary { list-style: none; cursor: pointer; }
-details > summary::-webkit-details-marker { display: none; }
-.legend > summary { display: flex; align-items: center; gap: var(--space-3); min-height: var(--size-target); color: var(--ink-muted); font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
-.legend > summary::before { content: "+"; width: 1em; }
-.legend[open] > summary::before { content: "2"; }
-.legend .swatches { display: inline-flex; gap: var(--space-1); }
-.legend .swatch { width: 10px; height: 10px; border: var(--stroke) solid var(--ink-muted); background: var(--swatch, var(--paper-raised)); }
-.legend .swatch.cat-comm { --swatch: var(--ch1); } .legend .swatch.cat-timer { --swatch: var(--ch0); }
-.legend .swatch.cat-analog { --swatch: var(--ch3); } .legend .swatch.cat-gpio { --swatch: var(--ch2); }
-.legend .swatch.cat-other { --swatch: var(--ink); }
-.legend .filtered { color: var(--ink); }
-.chips-row { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-1) 0 var(--space-2); }
+/* ---- the controls over the drawing: opaque, so the pins under them do not show through ---- */
+.hud { position: absolute; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.hud button, .hud input[type=search] { background: var(--paper-raised); }
+.hud button:hover, .hud button.toggle.on { background: var(--ink); }
+.hud.top { top: var(--space-2); left: var(--space-2); right: var(--space-2); }
+.hud.zoombar { right: var(--space-2); bottom: var(--space-2); flex-wrap: nowrap; background: var(--paper-raised); border: var(--stroke) solid var(--line-strong); gap: 0; }
+.hud.zoombar button { border-color: transparent; }
+.zoom { min-width: 4em; text-align: center; color: var(--ink-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.searchbox { display: inline-flex; align-items: center; gap: var(--space-1); background: var(--paper-raised); border: var(--stroke) solid var(--line-strong); }
+.searchbox input[type=search] { border: 0; min-width: 14em; flex: 1 1 14em; }
+.searchbox button { border-color: transparent; }
+.count { min-width: 4em; color: var(--ink-muted); }
+.busy { color: var(--ink-muted); }
+/* the legend panel: tags under the row; each is a filter, on = inverted */
+.pop {
+	position: absolute; top: calc(100% + var(--space-1)); left: 0; max-width: 100%; display: flex; flex-wrap: wrap; gap: var(--space-2);
+	padding: var(--space-2); background: var(--paper-raised); border: var(--stroke) solid var(--line-strong);
+}
 button.chip {
 	--swatch: var(--line-strong);
 	height: var(--size-target); min-height: var(--size-target); padding: 0 var(--space-3);
@@ -144,31 +158,12 @@ button.chip.cat-gpio { --swatch: var(--ch2); }
 button.chip.cat-other { --swatch: var(--ink); }
 button.chip.cat-free { --swatch: var(--paper-raised); }
 
-/* ---- layout ---- */
-/* Two columns while there is room for both (the drawing needs about 320px); the inspector scrolls
-   inside its column so the drawing and the inspector stay in one screen. One column only in a
-   very narrow window. */
-#app { display: flex; flex-direction: column; height: calc(100vh - var(--space-4)); }
-.main { flex: 1 1 0; min-height: 360px; display: grid; grid-template-columns: minmax(0, 1fr) clamp(260px, 34%, 380px); grid-template-rows: minmax(0, 1fr); gap: var(--space-4); margin-top: var(--space-2); }
-.package {
-	min-width: 0; min-height: 0; overflow: hidden;
-	background: var(--paper-sunken); border: var(--stroke) solid var(--line); cursor: grab; touch-action: none;
-}
-.package.dragging { cursor: grabbing; }
-.package svg { display: block; user-select: none; }
-aside { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; overflow-y: auto; }
-.source { margin: var(--space-2) 0 0; font: 400 12px/16px var(--font-mono); color: var(--ink-muted); }
-@media (max-width: 640px) {
-	#app { height: auto; }
-	.main { flex: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-	aside { overflow: visible; }
-	.package { height: 55vh; min-height: 300px; }
-}
-
 /* ---- the drawing: flat, 1px lines, ink for emphasis, the four channel colours for the data ---- */
 svg .body { fill: var(--paper-raised); stroke: var(--line-strong); stroke-width: 1; }
 svg .pin1 { fill: var(--ink); }
 svg text { fill: var(--ink); font-family: var(--font-mono); }
+svg text.chip-path, svg text.chip-sub { fill: var(--ink-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+svg text.chip { font-weight: 700; }
 svg .chip { fill: var(--ink-muted); font: 700 13px var(--font-sans); letter-spacing: 0; }
 svg .cell rect { fill: var(--paper-raised); stroke: var(--line-strong); stroke-width: 1; cursor: pointer; transition: opacity var(--duration-base) linear; }
 svg .cell { transition: opacity var(--duration-base) linear; }
@@ -204,6 +199,8 @@ svg .cell:focus-visible rect { stroke: var(--focus); stroke-width: 2; }
 .card-head .clear { margin-left: auto; }
 .facts { margin-top: var(--space-1); color: var(--ink-muted); }
 .block { margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--stroke) solid var(--line); }
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
 .block > summary { position: relative; padding-right: var(--space-6); min-height: var(--size-target); }
 .block > summary::after { content: "+"; position: absolute; right: 0; top: 0; font: 700 12px/16px var(--font-mono); color: var(--ink-muted); }
 .block[open] > summary::after { content: "2"; }

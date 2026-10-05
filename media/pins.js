@@ -29,7 +29,6 @@
 		['other', 'Other'],
 		['free', 'Unused'],
 	];
-	const NARROW = window.matchMedia('(max-width: 640px)');
 
 	let data;
 	let previous;
@@ -50,7 +49,7 @@
 	let searchText = new Map();
 	// What the user opened or closed, kept across selections and reloads: the legend and the blocks
 	// of the inspector (a block is open unless it says otherwise).
-	const ui = Object.assign({ legend: false, blocks: {} }, (vscode.getState() || {}).ui);
+	const ui = Object.assign({ legend: false, search: false, side: false, blocks: {} }, (vscode.getState() || {}).ui);
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -205,17 +204,18 @@
 			failure(data.error);
 			return;
 		}
-		app.append(toolbar());
-		if (data.hasProject) {
-			app.append(legend());
-		}
-		const main = el('div', 'main');
+		// The window is the chip: the drawing fills it, the controls float over it, and the
+		// inspector opens beside it.
+		const stage = el('div', 'stage' + (ui.side ? ' with-side' : ''));
+		stage.id = 'stage';
+		const view = el('div', 'view');
 		const canvas = el('div', 'package');
 		canvas.id = 'package';
+		view.append(canvas, hud(), zoomHud());
 		const side = el('aside');
 		side.id = 'side';
-		main.append(canvas, side);
-		app.append(main);
+		stage.append(view, side);
+		app.append(stage);
 		drawPackage();
 		drawSide();
 	}
@@ -228,25 +228,93 @@
 		return button;
 	}
 
-	function toolbar() {
-		const bar = el('div', 'bar');
-		bar.append(pathLabel('XRobot', 'Pin layout', data.platform));
-		const top = el('header');
-		top.append(el('h1', undefined, data.title), el('span', 'subtitle', data.subtitle));
-		top.append(el('span', 'busy', busy ? 'Updating' : ''));
-		const tools = el('span', 'tools');
+	// The zoom is a floating group in the corner.
+	function zoomHud() {
+		const group = el('div', 'hud zoombar');
 		const zoom = el('span', 'zoom', zoomLabel());
 		zoom.id = 'zoom';
-		tools.append(
+		group.append(
 			zoomButton('−', 'Zoom out', () => zoomBy(1 / 1.4)),
 			zoom,
 			zoomButton('+', 'Zoom in', () => zoomBy(1.4)),
 			zoomButton('Fit', 'Show the whole package (double click the drawing)', fit),
 		);
-		top.append(tools);
-		bar.append(top);
+		return group;
+	}
 
-		const second = el('div', 'searchrow');
+	function toggleButton(text, title, pressed, handler) {
+		const button = el('button', 'toggle' + (pressed ? ' on' : ''), text);
+		button.title = title;
+		button.setAttribute('aria-pressed', String(pressed));
+		button.addEventListener('click', handler);
+		return button;
+	}
+
+	// The controls over the drawing: search (a button that opens the field), the labels, the legend
+	// and the inspector. Each is a toggle; the legend opens a small panel under the row.
+	function hud() {
+		const bar = el('div', 'hud top');
+		bar.id = 'hud';
+		const searching = ui.search || query.trim().length > 0;
+		if (searching) {
+			bar.append(searchField());
+		} else {
+			bar.append(toggleButton('Search', 'Search a pin, signal or peripheral', false, () => {
+				ui.search = true;
+				rebuildHud(true);
+				persist();
+			}));
+		}
+		if (data.hasProject) {
+			bar.append(toggleButton('Functions', 'Label the selected pins with the function the project uses', showFunctions, () => {
+				showFunctions = !showFunctions;
+				rebuildHud();
+				drawPackage();
+				persist();
+			}));
+		}
+		const legendOpen = ui.legend || filters.size > 0;
+		bar.append(toggleButton('Legend' + (filters.size > 0 ? ' · ' + filters.size : ''), 'The categories of the pins; choose one to show only those', legendOpen, () => {
+			ui.legend = !legendOpen;
+			if (!ui.legend) {
+				filters.clear();
+				restyle();
+			}
+			rebuildHud();
+			persist();
+		}));
+		bar.append(toggleButton('Details', 'The pin or peripheral that is selected', ui.side, () => setSide(!ui.side)));
+		bar.append(el('span', 'busy', busy ? 'Updating' : ''));
+		if (legendOpen) {
+			bar.append(legendPanel());
+		}
+		return bar;
+	}
+
+	function rebuildHud(focusSearch) {
+		const old = document.getElementById('hud');
+		if (!old) {
+			return;
+		}
+		const next = hud();
+		old.replaceWith(next);
+		if (focusSearch) {
+			const input = next.querySelector('input');
+			if (input) {
+				input.focus();
+			}
+		}
+	}
+
+	function setSide(open) {
+		ui.side = open;
+		document.getElementById('stage').classList.toggle('with-side', open);
+		rebuildHud();
+		persist();
+	}
+
+	function searchField() {
+		const wrap = el('span', 'searchbox');
 		const search = el('input');
 		search.type = 'search';
 		search.placeholder = 'Search a pin, signal or peripheral';
@@ -260,7 +328,16 @@
 			count.textContent = matchCount();
 			persist();
 		});
-		// Enter goes to the next matching pin, Shift+Enter to the previous, Escape clears.
+		const close = () => {
+			search.value = '';
+			query = '';
+			matchIndex = -1;
+			ui.search = false;
+			restyle();
+			rebuildHud();
+			persist();
+		};
+		// Enter goes to the next matching pin, Shift+Enter to the previous, Escape closes the search.
 		search.addEventListener('keydown', (event) => {
 			if (event.key === 'Enter') {
 				const found = matches();
@@ -273,30 +350,14 @@
 				}
 				event.preventDefault();
 			} else if (event.key === 'Escape') {
-				search.value = '';
-				query = '';
-				matchIndex = -1;
-				restyle();
-				count.textContent = '';
-				persist();
+				close();
 			}
 		});
-		second.append(search, count);
-		if (data.hasProject) {
-			const label = el('button', 'toggle' + (showFunctions ? ' on' : ''), 'Show functions');
-			label.title = 'Label the selected pins with the function the project uses';
-			label.setAttribute('aria-pressed', String(showFunctions));
-			label.addEventListener('click', () => {
-				showFunctions = !showFunctions;
-				label.classList.toggle('on', showFunctions);
-				label.setAttribute('aria-pressed', String(showFunctions));
-				drawPackage();
-				persist();
-			});
-			second.append(label);
-		}
-		bar.append(second);
-		return bar;
+		const button = el('button', undefined, 'Close');
+		button.title = 'Close the search (Escape)';
+		button.addEventListener('click', close);
+		wrap.append(search, count, button);
+		return wrap;
 	}
 
 	function matchCount() {
@@ -310,30 +371,10 @@
 		return matchIndex >= 0 ? matchIndex + 1 + ' of ' + n : n + (n === 1 ? ' pin' : ' pins');
 	}
 
-	// The legend is a detail: closed, it is one quiet line with the colours; open, it lists the
-	// categories, which also filter the drawing.
-	function legend() {
-		const wrap = el('details', 'legend');
-		wrap.open = ui.legend || filters.size > 0;
-		const summary = el('summary');
-		summary.append(el('span', 'path-text', 'Legend'));
+	// The legend is a detail: a small panel the Legend button opens. Its tags also filter the drawing.
+	function legendPanel() {
+		const panel = el('div', 'pop');
 		const present = new Set(data.geometry.cells.map((cell) => cell.legend));
-		const swatches = el('span', 'swatches');
-		for (const [key] of LEGEND) {
-			if (present.has(key)) {
-				swatches.append(el('span', 'swatch cat-' + key));
-			}
-		}
-		summary.append(swatches);
-		const active = el('span', 'filtered', filters.size > 0 ? 'Filter: ' + filters.size : '');
-		summary.append(active);
-		wrap.append(summary);
-		wrap.addEventListener('toggle', () => {
-			ui.legend = wrap.open;
-			persist();
-		});
-		const bar = el('div', 'chips-row');
-		wrap.append(bar);
 		for (const [key, name] of LEGEND) {
 			if (!present.has(key)) {
 				continue;
@@ -349,13 +390,12 @@
 				}
 				chip.classList.toggle('on');
 				chip.setAttribute('aria-pressed', String(filters.has(key)));
-				active.textContent = filters.size > 0 ? 'Filter: ' + filters.size : '';
 				restyle();
 				persist();
 			});
-			bar.append(chip);
+			panel.append(chip);
 		}
-		return wrap;
+		return panel;
 	}
 
 	// ---- zoom and pan -------------------------------------------------------------------------
@@ -458,11 +498,6 @@
 		canvas.addEventListener(
 			'wheel',
 			(event) => {
-				// With the drawing above the inspector (a narrow window) the wheel scrolls the page;
-				// Ctrl or Command (and a trackpad pinch) zooms.
-				if (NARROW.matches && !event.ctrlKey && !event.metaKey) {
-					return;
-				}
 				event.preventDefault();
 				const at = drawingPoint(canvas, event);
 				zoomAt(event.deltaY < 0 ? 1.18 : 1 / 1.18, at.x, at.y);
@@ -611,7 +646,12 @@
 		canvas.setAttribute('aria-label', 'Package ' + data.subtitle + '. Arrow keys move between pins, Escape clears the selection.');
 		canvas.append(svg('rect', { class: 'body', x: g.body.x, y: g.body.y, width: g.body.width, height: g.body.height }));
 		canvas.append(svg('circle', { class: 'pin1', cx: g.marker.x, cy: g.marker.y, r: 3.4 }));
-		canvas.append(svg('text', { class: 'chip', x: g.body.x + g.body.width / 2, y: g.body.y + g.body.height / 2, 'text-anchor': 'middle' }, data.title));
+		// What the package is, written on the chip: the path label, the name and the package.
+		const mid = { x: g.body.x + g.body.width / 2, y: g.body.y + g.body.height / 2 };
+		const size = Math.max(6, Math.min(15, (g.body.width * 0.8) / (data.title.length * 0.62)));
+		canvas.append(svg('text', { class: 'chip-path', x: mid.x, y: mid.y - size * 1.25, 'text-anchor': 'middle', 'font-size': size * 0.55 }, ['XRobot', 'Pin layout', data.platform].join(' / ')));
+		canvas.append(svg('text', { class: 'chip', x: mid.x, y: mid.y + size * 0.3, 'text-anchor': 'middle', 'font-size': size }, data.title));
+		canvas.append(svg('text', { class: 'chip-sub', x: mid.x, y: mid.y + size * 1.4, 'text-anchor': 'middle', 'font-size': size * 0.62 }, data.subtitle));
 		for (const cell of g.cells) {
 			const group = svg('g', { class: 'cell ' + cell.className, role: 'button' });
 			group.setAttribute('aria-label', cellDescription(cell));
@@ -671,6 +711,7 @@
 		locatedPosition = undefined;
 		const detail = data.details[position];
 		const assigned = detail && detail.entries.map((entry) => entry.assigned).find(Boolean);
+		openSide();
 		restyle();
 		drawSide();
 		persist();
@@ -681,19 +722,32 @@
 		selectedPeripheral = name;
 		selectedPosition = undefined;
 		locatedPosition = undefined;
+		openSide();
 		restyle();
 		drawSide();
 		persist();
 		announce(name);
 	}
 
+	// The inspector opens by itself when something is selected.
+	function openSide() {
+		if (!ui.side) {
+			setSide(true);
+		}
+	}
+
+	// Clearing the selection closes the inspector.
 	function clearSelection() {
 		selectedPosition = undefined;
 		selectedPeripheral = undefined;
 		locatedPosition = undefined;
 		restyle();
 		drawSide();
-		persist();
+		if (ui.side) {
+			setSide(false);
+		} else {
+			persist();
+		}
 	}
 
 	// Brings a pin into view on the drawing and rings it, without changing the selection.
@@ -965,6 +1019,7 @@
 		selectedPeripheral = name;
 		selectedPosition = undefined;
 		locatedPosition = undefined;
+		openSide();
 		drawSide();
 		const candidates = candidatePositions();
 		fitCells(data.geometry.cells.filter((cell) => candidates.has(cell.position)));

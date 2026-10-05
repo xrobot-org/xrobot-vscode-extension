@@ -11,6 +11,10 @@
   1. The search box and the legend highlight and filter pins; clicking a pin lists the
   peripheral functions it can carry, and selecting a peripheral shows every pin that can
   carry each of its functions. Read-only. Needs a libxr release that has `libxr pins`.
+- The panel is the chip: the drawing fills the window, the name and package are written on the
+  chip, the controls (Search, Functions, Legend, Details) and the zoom float over it, and the
+  inspector opens beside it when something is selected. The legend is a panel opened by its
+  button and the inspector's blocks fold; what is open is remembered.
 - The panel zooms with the wheel around the pointer, pans with a drag and fits with a double
   click. The inspector shows one selection at a time, a pin or a peripheral, in plain
   sections (what the project uses it as, what else it can be, its settings and pins).
@@ -23,8 +27,8 @@
 - The panel: a zoom percentage, a search that Enter steps through, a Show functions toggle,
   a legend that filters by category (shown with a project only), keyboard navigation, a loading
   and an updating indicator, an error box with the CLI message and a link to the output, and the
-  zoom, search and selection kept when the panel is hidden. In a narrow window the wheel scrolls
-  the page (Ctrl+wheel zooms) and selecting a peripheral in the sidebar zooms to its pins.
+  zoom, search and selection kept when the panel is hidden. Selecting a peripheral in the sidebar
+  zooms to its pins.
 - The LibXR view has a Peripherals group: the peripherals the project selected, with their
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.
