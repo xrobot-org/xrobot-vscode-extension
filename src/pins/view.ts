@@ -20,11 +20,29 @@ export type EntryDetail = {
 export type PinDetail = { position: string; entries: EntryDetail[] };
 
 export type ViewCell = PinCell & {
-	// The text next to or in the cell.
+	// The pin name (always: it says which pin this is).
 	label: string;
+	// What follows the name: the peripheral function the project selected (USART1.TX), or the label
+	// the project gave a GPIO or an external interrupt (ACC_CS); undefined for a free pin.
+	functionLabel?: string;
 	// CSS classes: free, power, special, or assigned with a category (and mismatch).
 	className: string;
+	// The legend entry of the cell: a category of a selected pin, or free, power, special.
+	legend: string;
 	peripheral?: string;
+};
+
+// One function of a peripheral, with the pins that can carry it and the one the project uses.
+export type PeripheralFunction = { function: string; pins: string[]; current?: string };
+
+export type PeripheralDetail = {
+	kind: string;
+	category: Category;
+	functions: PeripheralFunction[];
+	config?: PinsConfig;
+	capabilities: string[];
+	// Whether the project selected a pin of it.
+	used: boolean;
 };
 
 export type UsedPeripheral = {
@@ -41,7 +59,10 @@ export type ViewData = {
 	source: string;
 	geometry: Omit<PackageGeometry, 'cells'> & { cells: ViewCell[] };
 	details: Record<string, PinDetail>;
-	used: UsedPeripheral[];
+	// Pin name -> position on the package.
+	positions: Record<string, string>;
+	// Every recognized peripheral (the CLI's recognition), by instance name.
+	peripherals: Record<string, PeripheralDetail>;
 	// Whether the result carries a project; without one nothing is selected.
 	hasProject: boolean;
 	configFile: string | null;
@@ -62,30 +83,58 @@ function functionsByPin(result: PinsResult): Map<string, PinFunction[]> {
 	return index;
 }
 
-function cellClass(result: PinsResult, names: string[]): { className: string; assigned?: PinsAssignment } {
+function cellClass(result: PinsResult, names: string[]): { className: string; legend: string; assigned?: PinsAssignment } {
 	const assignments = result.project?.assignments ?? {};
 	for (const name of names) {
 		const assigned = assignments[name];
 		if (assigned) {
 			const category = categoryOf(assigned.kind);
-			return { className: `assigned cat-${category}${assigned.matched ? '' : ' mismatch'}`, assigned };
+			return { className: `assigned cat-${category}${assigned.matched ? '' : ' mismatch'}`, legend: category, assigned };
 		}
 	}
 	const types = names.map((name) => result.pins.find((pin) => pin.name === name)?.type ?? '');
 	if (types.includes('Power')) {
-		return { className: 'power' };
+		return { className: 'power', legend: 'power' };
 	}
 	if (types.some((type) => type !== 'I/O' && type !== 'Default' && type !== 'MonoIO')) {
-		return { className: 'special' };
+		return { className: 'special', legend: 'special' };
 	}
-	return { className: 'free' };
+	return { className: 'free', legend: 'free' };
+}
+
+// What libxr gen generates comes first: peripherals with settings in libxr_config.yaml, then those
+// it would generate but that have none yet, then the rest. Used by the panel and the tree.
+export function usedPeripherals(result: PinsResult): UsedPeripheral[] {
+	const positionOfName = new Map(result.pins.map((pin) => [pin.name, pin.position]));
+	const used: UsedPeripheral[] = Object.entries(result.project?.peripherals ?? {}).map(([name, peripheral]) => ({
+		name,
+		kind: peripheral.kind,
+		category: categoryOf(peripheral.kind),
+		pins: Object.entries(peripheral.pins).map(([fn, pin]) => ({
+			function: fn,
+			pin,
+			position: positionOfName.get(pin) ?? '',
+		})),
+		...(peripheral.config ? { config: peripheral.config } : {}),
+	}));
+	const rank = (peripheral: UsedPeripheral): number => (peripheral.config ? (peripheral.config.present ? 0 : 1) : 2);
+	return used.sort((a, b) => rank(a) - rank(b));
+}
+
+// A GPIO or an external interrupt is shown by the label the project gave it, if any (its port and
+// line are the pin name); any other peripheral by its instance and function.
+function functionLabelOf(assigned: PinsAssignment): { functionLabel?: string } {
+	if (assigned.kind === 'GPIO' || assigned.kind === 'EXTI') {
+		return assigned.label ? { functionLabel: assigned.label } : {};
+	}
+	return { functionLabel: `${assigned.peripheral}.${assigned.function}` };
 }
 
 export function buildView(result: PinsResult): ViewData {
 	const geometry = packageGeometry(result.package, result.pins);
 	const functions = functionsByPin(result);
 	const pinByName = new Map(result.pins.map((pin) => [pin.name, pin]));
-	const positionOfName = new Map(result.pins.map((pin) => [pin.name, pin.position]));
+	const positions = Object.fromEntries(result.pins.map((pin) => [pin.name, pin.position]));
 
 	const details: Record<string, PinDetail> = {};
 	for (const pin of result.pins) {
@@ -103,31 +152,34 @@ export function buildView(result: PinsResult): ViewData {
 	}
 
 	const cells: ViewCell[] = geometry.cells.map((cell) => {
-		const { className, assigned } = cellClass(result, cell.names);
+		const { className, legend, assigned } = cellClass(result, cell.names);
 		const first = pinByName.get(cell.names[0] ?? '');
 		return {
 			...cell,
-			label: assigned?.label ?? first?.name ?? cell.position,
+			label: first?.name ?? cell.position,
 			className,
+			legend,
 			...(assigned ? { peripheral: assigned.peripheral } : {}),
+			...(assigned ? functionLabelOf(assigned) : {}),
 		};
 	});
 
-	const used: UsedPeripheral[] = Object.entries(result.project?.peripherals ?? {}).map(([name, peripheral]) => ({
-		name,
-		kind: peripheral.kind,
-		category: categoryOf(peripheral.kind),
-		pins: Object.entries(peripheral.pins).map(([fn, pin]) => ({
-			function: fn,
-			pin,
-			position: positionOfName.get(pin) ?? '',
-		})),
-		...(peripheral.config ? { config: peripheral.config } : {}),
-	}));
-	// What libxr gen generates comes first: peripherals with settings in libxr_config.yaml, then
-	// those it would generate but that have none yet, then the rest.
-	const rank = (peripheral: UsedPeripheral): number => (peripheral.config ? (peripheral.config.present ? 0 : 1) : 2);
-	used.sort((a, b) => rank(a) - rank(b));
+	const peripherals: Record<string, PeripheralDetail> = {};
+	for (const [name, entry] of Object.entries(result.peripherals)) {
+		const project = result.project?.peripherals[name];
+		peripherals[name] = {
+			kind: entry.kind,
+			category: categoryOf(entry.kind),
+			functions: Object.entries(entry.signals).map(([fn, pins]) => ({
+				function: fn,
+				pins,
+				...(project?.pins[fn] ? { current: project.pins[fn] } : {}),
+			})),
+			...(project?.config ? { config: project.config } : {}),
+			capabilities: entry.capabilities ?? [],
+			used: project !== undefined,
+		};
+	}
 
 	const sourceName = result.source.dataset ?? result.source.vendor ?? '';
 	return {
@@ -136,7 +188,8 @@ export function buildView(result: PinsResult): ViewData {
 		source: `${result.source.vendor ?? ''} ${sourceName}`.trim(),
 		geometry: { ...geometry, cells },
 		details,
-		used,
+		positions,
+		peripherals,
 		hasProject: result.project !== undefined,
 		configFile: result.project?.libxr_config ?? null,
 	};

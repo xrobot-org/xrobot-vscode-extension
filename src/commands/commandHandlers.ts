@@ -10,7 +10,7 @@ import {
 	type OpenFileTarget,
 } from '../providers/viewProviders';
 import type { InstanceEditTarget } from '../providers/instanceEditor';
-import { showPinLayout } from '../providers/pinView';
+import { showPinLayout, type ShowPinLayoutOptions } from '../providers/pinView';
 import {
 	addModuleInstance,
 	addRepo,
@@ -43,7 +43,10 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));
 	register('xrobot.openUrl', (url?: string) => openUrl(url));
 	register('xrobot.refreshAll', () => refreshAll());
-	register('xrobot.showPinLayout', () => showPinLayout(context));
+	// A Peripherals item passes { peripheral }; the title bar button and the palette pass nothing.
+	register('xrobot.showPinLayout', (options?: ShowPinLayoutOptions) =>
+		showPinLayout(context, typeof options?.peripheral === 'string' ? { peripheral: options.peripheral } : {}),
+	);
 	register('xrobot.collapseAllViews', async () => {
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');

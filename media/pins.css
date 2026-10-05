@@ -16,7 +16,9 @@ h2 { font-size: 1.05em; margin: 14px 0 6px; }
 h3 { margin: 6px 0; }
 h4 { margin: 10px 0 4px; font-weight: 600; }
 .subtitle { color: var(--vscode-descriptionForeground); }
-.tools { margin-left: auto; display: inline-flex; gap: 4px; }
+.tools { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+input[type=search] { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); padding: 2px 6px; min-width: 15em; border-radius: 2px; }
+input[type=search]:focus { outline: 1px solid var(--vscode-focusBorder); }
 button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 0; padding: 2px 8px; cursor: pointer; border-radius: 2px; }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 button.link { background: none; color: var(--vscode-textLink-foreground); padding: 4px 0; }
@@ -67,14 +69,53 @@ svg .cell:hover rect { stroke: var(--vscode-focusBorder); }
 .fn.cat-gpio .chip { border-color: var(--gpio); }
 .fn.cat-system .chip { border-color: var(--system); }
 .fn.cat-memory .chip { border-color: var(--memory); }
-.used { border-left: 4px solid var(--other); padding: 3px 8px; margin: 4px 0; cursor: pointer; }
-.used:hover { background: var(--vscode-list-hoverBackground); }
-.used.cat-comm { border-left-color: var(--comm); }
-.used.cat-timer { border-left-color: var(--timer); }
-.used.cat-analog { border-left-color: var(--analog); }
-.used.cat-gpio { border-left-color: var(--gpio); }
-.used.cat-system { border-left-color: var(--system); }
-.used.cat-memory { border-left-color: var(--memory); }
-.used .title { display: flex; gap: 8px; align-items: baseline; }
-.badge { font-size: 0.8em; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-.badge.dim { background: none; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); }
+
+/* legend, doubles as the category filter */
+.legend { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 8px; }
+.legend .chip { border-radius: 10px; padding: 1px 10px; background: none; color: var(--vscode-foreground); border: 1px solid var(--other); opacity: 0.75; }
+.legend .chip.on { opacity: 1; background: var(--other); color: #fff; }
+.legend .chip.cat-comm { border-color: var(--comm); } .legend .chip.cat-comm.on { background: var(--comm); }
+.legend .chip.cat-timer { border-color: var(--timer); } .legend .chip.cat-timer.on { background: var(--timer); }
+.legend .chip.cat-analog { border-color: var(--analog); } .legend .chip.cat-analog.on { background: var(--analog); }
+.legend .chip.cat-gpio { border-color: var(--gpio); } .legend .chip.cat-gpio.on { background: var(--gpio); }
+.legend .chip.cat-system { border-color: var(--system); } .legend .chip.cat-system.on { background: var(--system); }
+.legend .chip.cat-memory { border-color: var(--memory); } .legend .chip.cat-memory.on { background: var(--memory); }
+
+/* the drawing: pin 1 mark, search, filters and a selected peripheral's candidate pins */
+svg .pin1 { fill: var(--vscode-foreground); opacity: 0.8; }
+svg .cell.dimmed { opacity: 0.2; }
+svg .cell.match rect { stroke: var(--vscode-focusBorder); stroke-width: 1.6; }
+svg .cell.candidate rect { stroke: var(--vscode-focusBorder); stroke-width: 1.6; stroke-dasharray: 2 1; }
+svg .cell.current rect { stroke: var(--vscode-focusBorder); stroke-width: 2.4; }
+
+/* inspector */
+button.link.peripheral { font-weight: 600; padding: 0 4px 0 0; min-width: 5em; text-align: left; }
+.canbe details { margin: 2px 0; }
+.canbe summary { cursor: pointer; padding: 1px 0; font-weight: 600; }
+.canbe summary.cat-comm { color: var(--comm); } .canbe summary.cat-timer { color: var(--timer); }
+.canbe summary.cat-analog { color: var(--analog); } .canbe summary.cat-gpio { color: var(--gpio); }
+.canbe summary.cat-system { color: var(--system); } .canbe summary.cat-memory { color: var(--memory); }
+.fn .chip-fn { padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
+.fn.cat-comm .chip-fn { border-color: var(--comm); } .fn.cat-timer .chip-fn { border-color: var(--timer); }
+.fn.cat-analog .chip-fn { border-color: var(--analog); } .fn.cat-gpio .chip-fn { border-color: var(--gpio); }
+.fn.cat-system .chip-fn { border-color: var(--system); } .fn.cat-memory .chip-fn { border-color: var(--memory); }
+.peripheral-inspector h3 { display: flex; gap: 8px; align-items: baseline; }
+.peripheral-inspector h3 button.link { margin-left: auto; }
+.kind { font-size: 0.8em; padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
+.kind.cat-comm { border-color: var(--comm); } .kind.cat-timer { border-color: var(--timer); }
+.kind.cat-analog { border-color: var(--analog); } .kind.cat-gpio { border-color: var(--gpio); }
+.kind.cat-system { border-color: var(--system); } .kind.cat-memory { border-color: var(--memory); }
+.functions { margin-top: 6px; }
+.function { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
+.function .fname { flex: 0 0 5.5em; font-weight: 600; }
+.function .fpins { display: flex; gap: 4px; flex-wrap: wrap; }
+.pinchip { padding: 0 6px; border-radius: 8px; border: 1px solid var(--vscode-panel-border); background: none; color: var(--vscode-foreground); }
+.pinchip:hover { border-color: var(--vscode-focusBorder); }
+.pinchip.current { background: var(--vscode-focusBorder); color: #fff; border-color: var(--vscode-focusBorder); }
+
+/* a narrow window puts the inspector below the drawing */
+@media (max-width: 900px) {
+	.main { flex-direction: column; }
+	aside { flex: none; width: 100%; }
+	.package { flex: none; width: 100%; max-height: none; }
+}

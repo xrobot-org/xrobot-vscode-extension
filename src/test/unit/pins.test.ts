@@ -7,7 +7,7 @@ import { libxrArgs } from '../../cli/xrobotCli';
 import { packageGeometry, pinCount } from '../../pins/geometry';
 import { categoryOf, parsePinsOutput, type PinsPin, type PinsResult } from '../../pins/model';
 import { detectPinsProject, findTiHeader } from '../../pins/project';
-import { buildView } from '../../pins/view';
+import { buildView, usedPeripherals } from '../../pins/view';
 
 // Real `libxr pins -d` output (CodeGenerator, `libxr pins` of dev), trimmed to nothing: an
 // STM32F103C8T6 in a project with USART1, SPI1, an LED and a key, and the MSPM0G3507 template
@@ -193,9 +193,10 @@ suite('pin layout view', () => {
 		assert.strictEqual(ofName('PA0')?.className, 'free');
 	});
 
-	test('a GPIO is labelled with the name the project gave it', () => {
+	test('a GPIO keeps its pin name and is followed by the label the project gave it', () => {
 		const led = view.geometry.cells.find((candidate) => candidate.names.some((name) => name.startsWith('PC13')));
-		assert.strictEqual(led?.label, 'LED');
+		assert.strictEqual(led?.label, 'PC13-TAMPER-RTC');
+		assert.strictEqual(led?.functionLabel, 'LED');
 	});
 
 	test('power pins are marked', () => {
@@ -204,18 +205,62 @@ suite('pin layout view', () => {
 	});
 
 	test('the peripherals LibXR generates come first, with their settings', () => {
-		assert.strictEqual(view.used[0].name, 'USART1');
-		assert.deepStrictEqual(view.used[0].config?.params, {
+		const used = usedPeripherals(fixture('pins-stm32f103c8.json'));
+		assert.strictEqual(used[0].name, 'USART1');
+		assert.deepStrictEqual(used[0].config?.params, {
 			tx_buffer_size: 128,
 			rx_buffer_size: 128,
 			tx_queue_size: 5,
 			dma_section: '',
 		});
-		const spi = view.used.find((used) => used.name === 'SPI1');
-		assert.strictEqual(spi?.config?.present, false);
-		const gpio = view.used.find((used) => used.name === 'GPIOC');
-		assert.strictEqual(gpio?.config, undefined);
-		assert.ok(view.used.indexOf(view.used.find((used) => used.name === 'GPIOC')!) > view.used.indexOf(spi!));
+		const names = used.map((peripheral) => peripheral.name);
+		assert.strictEqual(used.find((peripheral) => peripheral.name === 'SPI1')?.config?.present, false);
+		assert.strictEqual(used.find((peripheral) => peripheral.name === 'GPIOC')?.config, undefined);
+		// configured, then generated but not configured, then the rest.
+		assert.ok(names.indexOf('USART1') < names.indexOf('SPI1') && names.indexOf('SPI1') < names.indexOf('GPIOC'));
+	});
+
+	test('a selected pin shows what it does, a free one nothing', () => {
+		const ofName = (name: string) => view.geometry.cells.find((candidate) => candidate.names.includes(name));
+		assert.strictEqual(ofName('PA9')?.functionLabel, 'USART1.TX');
+		assert.strictEqual(ofName('PA9')?.legend, 'comm');
+		// A GPIO or an external interrupt is followed by its label, not by GPIOC.P13 or EXTI.LINE12.
+		assert.strictEqual(ofName('PB12')?.functionLabel, 'KEY');
+		assert.strictEqual(ofName('PB12')?.peripheral, 'EXTI');
+		const free = view.geometry.cells.find((candidate) => candidate.legend === 'free');
+		assert.strictEqual(free?.functionLabel, undefined);
+		assert.deepStrictEqual(
+			[...new Set(view.geometry.cells.map((candidate) => candidate.legend))].sort(),
+			['comm', 'free', 'gpio', 'power', 'special'].filter((legend) => view.geometry.cells.some((candidate) => candidate.legend === legend)),
+		);
+	});
+
+	test('a peripheral lists every pin that can carry each function, and the one in use', () => {
+		const usart1 = view.peripherals.USART1;
+		assert.strictEqual(usart1.category, 'comm');
+		assert.strictEqual(usart1.used, true);
+		const tx = usart1.functions.find((fn) => fn.function === 'TX');
+		assert.deepStrictEqual(tx?.pins.slice().sort(), ['PA9', 'PB6']);
+		assert.strictEqual(tx?.current, 'PA9');
+		assert.strictEqual(usart1.config?.key, 'usart1');
+		assert.strictEqual(view.peripherals.TIM3.used, false);
+		assert.ok(view.peripherals.TIM3.capabilities.includes('pwm'));
+	});
+
+	test('a pin name finds its position', () => {
+		assert.strictEqual(view.positions.PA9, view.details[view.positions.PA9].position);
+		assert.ok(view.details[view.positions.PA9].entries.some((entry) => entry.name === 'PA9'));
+	});
+
+	test('the pin 1 mark is at the corner by pin 1 in every shape', () => {
+		const quad = packageGeometry('LQFP48', fixture('pins-stm32f103c8.json').pins);
+		const first = cellAt(quad, '1');
+		const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+		for (const other of ['13', '25', '37']) {
+			assert.ok(distance(quad.marker, first) < distance(quad.marker, cellAt(quad, other)), other);
+		}
+		const grid = packageGeometry('UFBGA', pins(['A1', 'A2', 'B1', 'B2']));
+		assert.ok(distance(grid.marker, cellAt(grid, 'A1')) < distance(grid.marker, cellAt(grid, 'B2')));
 	});
 
 	test('a pin lists the functions it can carry, from the CLI recognition', () => {
@@ -234,7 +279,7 @@ suite('pin layout view', () => {
 		assert.strictEqual(entry.iomuxPincm, 1);
 		assert.strictEqual(entry.modes?.['UART0.TX'], 2);
 		assert.strictEqual(entry.assigned?.signal, 'UART0.TX');
-		assert.strictEqual(mspm0.used.find((used) => used.name === 'UART0')?.config, undefined);
+		assert.strictEqual(usedPeripherals(fixture('pins-mspm0g3507.json')).find((used) => used.name === 'UART0')?.config, undefined);
 	});
 
 	test('a layout without a project has nothing selected', () => {
@@ -242,7 +287,8 @@ suite('pin layout view', () => {
 		delete result.project;
 		const plain = buildView(result);
 		assert.strictEqual(plain.hasProject, false);
-		assert.strictEqual(plain.used.length, 0);
+		assert.strictEqual(usedPeripherals(result).length, 0);
+		assert.strictEqual(Object.values(plain.peripherals).filter((peripheral) => peripheral.used).length, 0);
 		assert.ok(plain.geometry.cells.every((candidate) => !candidate.className.startsWith('assigned')));
 		assert.strictEqual(cell('1').className === 'assigned', false);
 	});

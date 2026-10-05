@@ -27,13 +27,15 @@ export type PackageGeometry = {
 	height: number;
 	// The package body.
 	body: { x: number; y: number; width: number; height: number };
+	// Where the pin 1 mark goes: the corner by pin 1 (the top-left, where position 1 or A1 is).
+	marker: { x: number; y: number };
 	cells: PinCell[];
 };
 
 export const PITCH = 16;
 export const PIN_LENGTH = 10;
 // Room for the pin names outside the body of a leaded package.
-export const LABEL_SPACE = 96;
+export const LABEL_SPACE = 124;
 export const GRID_CELL = 26;
 
 const DUAL_NAMES = /^(TSSOP|SSOP|VSSOP|MSOP|SOP|SOIC|SO\d*|DIP|SOT|WSON|SON|PDIP)/i;
@@ -141,7 +143,7 @@ function leadedGeometry(packageName: string, positions: Map<string, string[]>): 
 	});
 	const width = left + bodyWidth + LABEL_SPACE;
 	const height = top + bodyHeight + (dual ? 30 : LABEL_SPACE) + (extras.some((key) => !/^\d+$/.test(key)) ? 30 : 0);
-	return { shape: dual ? 'dual' : 'quad', width, height, body, cells };
+	return { shape: dual ? 'dual' : 'quad', width, height, body, marker: { x: body.x + 9, y: body.y + 9 }, cells };
 }
 
 function gridGeometry(positions: Map<string, string[]>): PackageGeometry {
@@ -190,6 +192,7 @@ function gridGeometry(positions: Map<string, string[]>): PackageGeometry {
 		width,
 		height,
 		body: { x: margin - 4, y: margin - 4, width: columns.length * GRID_CELL + 6, height: rows.length * GRID_CELL + 6 },
+		marker: { x: margin - 4, y: margin - 4 },
 		cells,
 	};
 }

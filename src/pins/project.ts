@@ -65,3 +65,16 @@ export function detectPinsProject(root: string, iocFiles: string[]): PinsProject
 	const header = findTiHeader(root);
 	return header ? { platform: 'mspm0', source: header } : undefined;
 }
+
+// The .ioc files in the root of a workspace, sorted (the CLI takes the first).
+export function listIocFiles(root: string): string[] {
+	try {
+		return fs
+			.readdirSync(root, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.ioc'))
+			.map((entry) => entry.name)
+			.sort();
+	} catch {
+		return [];
+	}
+}

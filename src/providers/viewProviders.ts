@@ -27,6 +27,9 @@ import { libxrArgs, xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
 import { detectPinsProject } from '../pins/project';
+import { pinsService, type PinsState } from '../pinsService';
+import { categoryOf, type Category } from '../pins/model';
+import { usedPeripherals, type UsedPeripheral } from '../pins/view';
 
 export type CliRunRequest = {
 	label: string;
@@ -44,7 +47,7 @@ export type OpenFileTarget = {
 	exists: boolean;
 };
 
-export type TreeNode = GroupNode | FileNode | YamlValueNode | ActionNode | UrlNode | MessageNode | OpNode;
+export type TreeNode = GroupNode | FileNode | YamlValueNode | ActionNode | UrlNode | MessageNode | OpNode | PeripheralNode;
 
 type GroupNode = {
 	type: 'group';
@@ -107,6 +110,17 @@ type OpNode = {
 	iconId?: string;
 };
 
+// A peripheral the project selected: its pins and settings below it; clicking it opens the pin
+// layout with the peripheral selected.
+type PeripheralNode = {
+	type: 'peripheral';
+	label: string;
+	description: string;
+	category: Category;
+	peripheral: string;
+	children: TreeNode[];
+};
+
 type WorkspaceContext = {
 	root: string;
 	iocFiles: string[];
@@ -146,7 +160,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			return this.buildRoot(ctx);
 		}
 
-		if (element.type === 'group') {
+		if (element.type === 'group' || element.type === 'peripheral') {
 			return element.children;
 		}
 
@@ -173,7 +187,8 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			// The pin layout works for an MSPM0; LibXR code generation is STM32 only.
 			return [
 				fileNode(`Platform: [MSPM0] ${ctx.pinsSource ?? ''}`, path.join(ctx.root, ctx.pinsSource ?? ''), ctx.pinsSource ?? '', 'none'),
-				groupNode('Actions', [pinLayoutNode()], false),
+				pinLayoutNode(pinsService.state),
+				...peripheralNodes(pinsService.state),
 				messageNode('Code generation: STM32 only'),
 			];
 		}
@@ -191,6 +206,8 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		if (!ctx.hasLibxrConfig) {
 			return [
 				platformItem,
+				pinLayoutNode(pinsService.state),
+				...peripheralNodes(pinsService.state),
 				groupNode(
 					'Actions',
 					[
@@ -199,7 +216,6 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 							tool: 'libxr',
 							args: ['stm32', 'setup', '-d', '.'],
 						}),
-						pinLayoutNode(),
 					],
 					false,
 				),
@@ -222,7 +238,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		return [
 			platformItem,
+			pinLayoutNode(pinsService.state),
 			systemItem,
+			...peripheralNodes(pinsService.state),
 			groupNode(flashLabel, flashLayoutNodes, false),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
@@ -300,7 +318,6 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		if (ctx.platform === 'stm32') {
 			nodes.push(
-				pinLayoutNode(),
 				actionNode('Configure CubeMX (libxr stm32 setup)', {
 					label: 'libxr stm32 setup',
 					tool: 'libxr',
@@ -709,6 +726,17 @@ function sourceLabel(url: string): string {
 }
 
 function createTreeItem(node: TreeNode): vscode.TreeItem {
+	if (node.type === 'peripheral') {
+		const item = new vscode.TreeItem(
+			node.label,
+			node.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+		);
+		item.description = node.description;
+		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category]);
+		item.command = { command: 'xrobot.showPinLayout', title: 'Show Pin Layout', arguments: [{ peripheral: node.peripheral }] };
+		return item;
+	}
+
 	if (node.type === 'group') {
 		const item = new vscode.TreeItem(
 			node.label,
@@ -907,9 +935,74 @@ function actionNode(label: string, runRequest: CliRunRequest): ActionNode {
 	return { type: 'action', label, runRequest };
 }
 
-// Opens the pin layout panel (`libxr pins`).
-function pinLayoutNode(): OpNode {
-	return opNode('Show Pin Layout (libxr pins)', 'xrobot.showPinLayout', [], 'package and selected pins', 'circuit-board');
+// Opens the pin layout panel (`libxr pins`): a view of the chip, not an action on the project.
+function pinLayoutNode(state: PinsState): OpNode {
+	let description: string | undefined;
+	if (state.status === 'ok') {
+		description = `${state.result.package} · ${state.result.pin_count} pins`;
+	} else if (state.status === 'running') {
+		description = state.previous ? `${state.previous.package} · ${state.previous.pin_count} pins` : 'loading…';
+	} else if (state.status === 'error') {
+		description = 'unavailable';
+	}
+	return opNode('Pin Layout', 'xrobot.showPinLayout', [], description, 'circuit-board');
+}
+
+const CATEGORY_ICONS: Record<Category, string> = {
+	comm: 'plug',
+	timer: 'watch',
+	analog: 'pulse',
+	gpio: 'circle-filled',
+	system: 'gear',
+	memory: 'database',
+	other: 'circuit-board',
+};
+
+function peripheralNode(used: UsedPeripheral): PeripheralNode {
+	const children: TreeNode[] = used.pins.map((pin) =>
+		messageNode(`${pin.function}: ${pin.pin}`, undefined, { iconId: 'arrow-right' }),
+	);
+	if (used.config) {
+		children.push(
+			used.config.present
+				? groupNode(
+						`${used.config.section}.${used.config.key}`,
+						Object.entries(used.config.params ?? {}).map(([name, value]) =>
+							messageNode(`${name}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`, undefined, { iconId: 'symbol-field' }),
+						),
+						false,
+						`${Object.keys(used.config.params ?? {}).length} settings`,
+				  )
+				: messageNode(`${used.config.section}.${used.config.key}: not in libxr_config.yaml`, undefined, { iconId: 'warning' }),
+		);
+	}
+	const status = used.config ? (used.config.present ? 'configured' : 'not configured') : '';
+	const pins = used.pins.map((pin) => `${pin.function} ${pin.pin}`).join(' · ');
+	return {
+		type: 'peripheral',
+		label: used.name,
+		description: [status, pins].filter(Boolean).join(' · '),
+		category: categoryOf(used.kind),
+		peripheral: used.name,
+		children,
+	};
+}
+
+// The peripherals the project selected, from the shared `libxr pins` result; nothing when the
+// workspace has no chip project, and the CLI's own message when it failed.
+function peripheralNodes(state: PinsState): TreeNode[] {
+	if (state.status === 'none') {
+		return [];
+	}
+	if (state.status === 'error') {
+		return [messageNode(`Peripherals: ${state.message}`, undefined, { iconId: 'error' })];
+	}
+	const result = state.status === 'ok' ? state.result : state.previous;
+	if (!result) {
+		return [messageNode('Peripherals: loading…', undefined, { iconId: 'sync' })];
+	}
+	const used = usedPeripherals(result);
+	return [groupNode('Peripherals', used.map(peripheralNode), true, `${used.length} selected`)];
 }
 
 function opNode(label: string, command: string, args: unknown[] = [], description?: string, iconId?: string): OpNode {
@@ -1265,6 +1358,8 @@ export function registerWatchers(context: vscode.ExtensionContext, refreshAll: (
 	// entry source with its XR_REGISTER lines) and of the LibXR view.
 	const patterns = [
 		'*.ioc',
+		// The SysConfig header of an MSPM0 project (the root, sysconfig/, or a level or two down).
+		'{,*/,*/*/,*/*/*/}ti_msp_dl_config.h',
 		'Modules/modules.yaml',
 		'Modules/sources.yaml',
 		'xrobot.lock',

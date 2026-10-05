@@ -82,7 +82,8 @@
       },
       {
         "command": "xrobot.showPinLayout",
-        "title": "XRobot: Show Pin Layout"
+        "title": "XRobot: Show Pin Layout",
+        "icon": "$(circuit-board)"
       },
       {
         "command": "xrobot.collapseAllViews",
@@ -169,6 +170,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "xrobot.showPinLayout",
+          "when": "view == xrobot.libxrView",
+          "group": "navigation@1"
+        },
         {
           "command": "xrobot.collapseAllViews",
           "when": "view == xrobot.libxrView || view == xrobot.xrobotView",

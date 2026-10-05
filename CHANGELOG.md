@@ -4,11 +4,16 @@
 
 ### Added
 
-- `XRobot: Show Pin Layout` (also in the LibXR view): a panel with the package and pin
-  layout of the project's chip from `libxr pins -d`, and the pins the project selected
-  coloured by peripheral category. Clicking a pin lists the peripheral functions it can
-  carry; a selected peripheral shows its section in `libxr_config.yaml` and its current
-  parameters. Read-only. Needs a libxr release that has `libxr pins`.
+- `XRobot: Show Pin Layout` (also the Pin Layout item and the title bar button of the LibXR
+  view): a panel with the package and pin layout of the project's chip from `libxr pins -d`.
+  The pins the project selected are coloured by peripheral category and labelled with the
+  pin name and the function (`PA9 USART1.TX`) or the GPIO label; the top-left dot marks pin
+  1. The search box and the legend highlight and filter pins; clicking a pin lists the
+  peripheral functions it can carry, and selecting a peripheral shows every pin that can
+  carry each of its functions. Read-only. Needs a libxr release that has `libxr pins`.
+- The LibXR view has a Peripherals group: the peripherals the project selected, with their
+  pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
+  panel and the group share one `libxr pins` run per refresh.
 - MSPM0 projects (a SysConfig `ti_msp_dl_config.h`) are recognized: the LibXR view shows the
   platform and the pin layout. The setting `xrobot.libxr.package` gives the package.
 

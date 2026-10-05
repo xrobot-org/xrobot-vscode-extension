@@ -142,20 +142,29 @@ view's actions are `libxr stm32 setup`, `libxr parse`, `libxr gen` and `libxr st
 
 ### 引脚布局 / Pin Layout
 
-"Show Pin Layout" 打开芯片的封装图（`libxr pins`，需要带有该命令的 libxr）：每个引脚的位置、名称和全部可选信号，
-工程在 `.ioc`（STM32）或 SysConfig 生成的 `ti_msp_dl_config.h`（MSPM0）中已选的引脚按外设类别着色。点击引脚
-显示它能承载的外设功能；已选的外设显示它在 `libxr_config.yaml` 中的段和当前参数。图中列出所有识别出的外设，
-包括 LibXR 没有对应抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装用设置 `xrobot.libxr.package` 给出。
-目前只读；MSPM0 只有引脚布局，LibXR 代码生成仅支持 STM32。
+LibXR 视图中的 "Pin Layout" 打开芯片的封装图（`libxr pins`，需要带有该命令的 libxr），"Peripherals" 列出工程在
+`.ioc`（STM32）或 SysConfig 生成的 `ti_msp_dl_config.h`（MSPM0）中已选的外设：引脚、已配置或未配置，以及它在
+`libxr_config.yaml` 中的段和当前参数。点击一个外设会打开封装图并选中它：它每个功能当前用的引脚和其他可选的引脚。
 
-"Show Pin Layout" opens the package drawing of the chip (`libxr pins`, which needs a libxr release
-that has the command): the position, name and all selectable signals of every pin, with the pins
-the project selected in its `.ioc` (STM32) or in the `ti_msp_dl_config.h` SysConfig generates
-(MSPM0) coloured by peripheral category. Clicking a pin shows the peripheral functions it can
-carry; a selected peripheral shows its section in `libxr_config.yaml` and its current parameters.
-Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC,
-OctoSPI, ...). Give the package of an MSPM0 with the `xrobot.libxr.package` setting. The panel is
-read-only for now; an MSPM0 has the pin layout only, and LibXR code generation is STM32 only.
+封装图：已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
+左上角的圆点是 1 脚。搜索框按引脚名、信号或外设（如 `usart1 tx`）高亮匹配的引脚，图例可以按类别过滤。点击引脚
+显示它能承载的外设功能（按类别折叠），点击其中的外设名选中该外设。图中列出所有识别出的外设，包括 LibXR 没有对应
+抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装用设置 `xrobot.libxr.package` 给出。目前只读；MSPM0 只有引脚布局，
+LibXR 代码生成仅支持 STM32。
+
+"Pin Layout" in the LibXR view opens the package drawing of the chip (`libxr pins`, which needs a libxr release that has the
+command); "Peripherals" lists what the project selected in its `.ioc` (STM32) or in the `ti_msp_dl_config.h` SysConfig
+generates (MSPM0): the pins, configured or not, and its section in `libxr_config.yaml` with the current parameters.
+Clicking a peripheral opens the drawing with it selected: the pin each of its functions uses and the other pins that can
+carry it.
+
+In the drawing the selected pins are coloured by peripheral category and labelled with the pin name and the selected
+function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the top-left corner marks pin 1. The search
+box highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend filters by
+category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
+it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). Give the
+package of an MSPM0 with the `xrobot.libxr.package` setting. The panel is read-only for now; an MSPM0 has the pin layout
+only, and LibXR code generation is STM32 only.
 
 ---
 
