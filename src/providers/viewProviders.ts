@@ -863,9 +863,21 @@ function yamlChildrenForFile(node: FileNode): TreeNode[] {
 	if (node.label === 'Config File') {
 		const rootObj = asRecord(parsed.value);
 		if (rootObj) {
+			const shown = settingsShownInPeripherals(pinsService.state);
 			const filtered: Record<string, unknown> = {};
 			for (const [k, v] of Object.entries(rootObj)) {
 				if (k === 'SYSTEM' || k === 'FlashLayout') {
+					continue;
+				}
+				// The settings of a peripheral are edited under Peripherals: not listed twice. What
+				// the project does not use stays here, so nothing in the file is out of reach.
+				const section = shown.get(k);
+				const entries = asRecord(v);
+				if (section && entries) {
+					const rest = Object.fromEntries(Object.entries(entries).filter(([key]) => !section.has(key)));
+					if (Object.keys(rest).length > 0) {
+						filtered[k] = rest;
+					}
 					continue;
 				}
 				filtered[k] = v;
@@ -874,6 +886,25 @@ function yamlChildrenForFile(node: FileNode): TreeNode[] {
 		}
 	}
 	return toYamlValueNodes(parsed.value, 0, node.absolutePath, [], false);
+}
+
+// The sections and keys of libxr_config.yaml that the Peripherals group shows (peripherals the
+// project uses that have settings in the file), so the Config File does not list them again. Empty
+// while the shared `libxr pins` result is missing: the Config File then shows everything.
+function settingsShownInPeripherals(state: PinsState): Map<string, Set<string>> {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
+	const shown = new Map<string, Set<string>>();
+	if (!result) {
+		return shown;
+	}
+	for (const used of usedPeripherals(result)) {
+		if (used.config?.present) {
+			const keys = shown.get(used.config.section) ?? new Set<string>();
+			keys.add(used.config.key);
+			shown.set(used.config.section, keys);
+		}
+	}
+	return shown;
 }
 
 function yamlChildrenForValue(node: YamlValueNode): TreeNode[] {
