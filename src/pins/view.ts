@@ -1,6 +1,6 @@
 // What the pin layout webview shows, computed from the `libxr pins` result. Pure.
 import { packageGeometry, type PackageGeometry, type PinCell } from './geometry';
-import { categoryOf, platformLabel, type Category, type PinsAssignment, type PinsConfig, type PinsResult } from './model';
+import { categoryOf, platformLabel, type Category, type PinsAssignment, type PinsConfig, type PinsResult, type PinsSysconfig } from './model';
 
 // The peripheral functions that a pin can carry, from the CLI's own recognition (no second set of
 // naming rules here): the pin name -> instance, kind and function.
@@ -40,6 +40,7 @@ export type PeripheralDetail = {
 	category: Category;
 	functions: PeripheralFunction[];
 	config?: PinsConfig;
+	sysconfig?: PinsSysconfig;
 	capabilities: string[];
 	// Whether the project selected a pin of it.
 	used: boolean;
@@ -51,6 +52,7 @@ export type UsedPeripheral = {
 	category: Category;
 	pins: { function: string; pin: string; position: string }[];
 	config?: PinsConfig;
+	sysconfig?: PinsSysconfig;
 };
 
 export type ViewData = {
@@ -63,9 +65,12 @@ export type ViewData = {
 	positions: Record<string, string>;
 	// Every recognized peripheral (the CLI's recognition), by instance name.
 	peripherals: Record<string, PeripheralDetail>;
+	platform: string;
 	// Whether the result carries a project; without one nothing is selected.
 	hasProject: boolean;
 	configFile: string | null;
+	// The .syscfg of an MSPM0 project, relative to the project.
+	sysconfigFile: string | null;
 };
 
 // Pin name -> the functions the CLI recognized for it.
@@ -116,6 +121,7 @@ export function usedPeripherals(result: PinsResult): UsedPeripheral[] {
 			position: positionOfName.get(pin) ?? '',
 		})),
 		...(peripheral.config ? { config: peripheral.config } : {}),
+		...(peripheral.sysconfig ? { sysconfig: peripheral.sysconfig } : {}),
 	}));
 	const rank = (peripheral: UsedPeripheral): number => (peripheral.config ? (peripheral.config.present ? 0 : 1) : 2);
 	return used.sort((a, b) => rank(a) - rank(b));
@@ -176,6 +182,7 @@ export function buildView(result: PinsResult): ViewData {
 				...(project?.pins[fn] ? { current: project.pins[fn] } : {}),
 			})),
 			...(project?.config ? { config: project.config } : {}),
+			...(project?.sysconfig ? { sysconfig: project.sysconfig } : {}),
 			capabilities: entry.capabilities ?? [],
 			used: project !== undefined,
 		};
@@ -190,7 +197,9 @@ export function buildView(result: PinsResult): ViewData {
 		details,
 		positions,
 		peripherals,
+		platform: result.platform,
 		hasProject: result.project !== undefined,
 		configFile: result.project?.libxr_config ?? null,
+		sysconfigFile: result.project?.sysconfig_file ?? null,
 	};
 }

@@ -28,6 +28,9 @@
 - The LibXR view has a Peripherals group: the peripherals the project selected, with their
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.
+- The settings of an MSPM0 peripheral (baud rate, interrupts, ...) are read from the `.syscfg` and
+  shown read-only in the panel and under the peripheral in the Peripherals group, with an Open
+  in SysConfig item (`vscode.open`).
 - MSPM0 projects (a SysConfig `ti_msp_dl_config.h`) are recognized: the LibXR view shows the
   platform and the pin layout. The package comes from the SysConfig project (the `.syscfg`);
   the setting `xrobot.libxr.package` only overrides it.

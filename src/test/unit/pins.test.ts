@@ -282,6 +282,31 @@ suite('pin layout view', () => {
 		assert.strictEqual(usedPeripherals(fixture('pins-mspm0g3507.json')).find((used) => used.name === 'UART0')?.config, undefined);
 	});
 
+	test('an MSPM0 peripheral carries the settings of its SysConfig project, read-only', () => {
+		const result = fixture('pins-mspm0g3507.json');
+		const mspm0 = buildView(result);
+		assert.strictEqual(mspm0.platform, 'mspm0');
+		assert.strictEqual(mspm0.sysconfigFile, 'sysconfig/untitled.syscfg');
+		const uart = mspm0.peripherals.UART0;
+		assert.deepStrictEqual(uart.sysconfig, {
+			module: 'UART',
+			name: 'UART_0',
+			params: { enabledInterrupts: ['RX', 'TX'], targetBaudRate: 2000000 },
+		});
+		// No libxr_config.yaml for an MSPM0, and a GPIO has no SysConfig settings of its own.
+		assert.strictEqual(uart.config, undefined);
+		assert.strictEqual(mspm0.peripherals.GPIOB.sysconfig, undefined);
+		const used = usedPeripherals(result).find((peripheral) => peripheral.name === 'UART0');
+		assert.strictEqual(used?.sysconfig?.params.targetBaudRate, 2000000);
+	});
+
+	test('an STM32 has no SysConfig file and its settings stay in libxr_config.yaml', () => {
+		assert.strictEqual(view.platform, 'stm32');
+		assert.strictEqual(view.sysconfigFile, null);
+		assert.strictEqual(view.peripherals.USART1.sysconfig, undefined);
+		assert.strictEqual(view.peripherals.USART1.config?.present, true);
+	});
+
 	test('a layout without a project has nothing selected', () => {
 		const result = fixture('pins-stm32f103c8.json');
 		delete result.project;

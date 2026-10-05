@@ -2585,6 +2585,7 @@
   "directory": "/project",
   "source": "sysconfig/ti_msp_dl_config.h",
   "libxr_config": null,
+  "sysconfig_file": "sysconfig/untitled.syscfg",
   "assignments": {
    "PA0": {
     "signal": "UART0.TX",
@@ -2621,6 +2622,17 @@
     "pins": {
      "RX": "PA1",
      "TX": "PA0"
+    },
+    "sysconfig": {
+     "module": "UART",
+     "name": "UART_0",
+     "params": {
+      "enabledInterrupts": [
+       "RX",
+       "TX"
+      ],
+      "targetBaudRate": 2000000
+     }
     }
    }
   }

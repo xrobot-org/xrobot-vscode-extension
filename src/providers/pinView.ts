@@ -79,19 +79,20 @@ function show(state: PinsState): void {
 	}
 }
 
-async function openConfigFile(): Promise<void> {
+// Opens a file of the project the CLI named (a path relative to the workspace, or absolute). Only a
+// file inside the workspace: the path comes from the CLI's output. `vscode.open` lets an editor
+// that is registered for the file type (TI's SysConfig for a .syscfg) take it.
+async function openProjectFile(file: string | null): Promise<void> {
 	const root = getWorkspaceRoot();
-	const file = latest && 'configFile' in latest ? latest.configFile : null;
 	if (!root || !file) {
 		return;
 	}
 	const absolute = path.resolve(root, file);
-	// Only a file inside the workspace; the path comes from the CLI's output.
 	const relative = path.relative(root, absolute);
 	if (relative.startsWith('..') || path.isAbsolute(relative)) {
 		return;
 	}
-	await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(absolute)));
+	await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(absolute));
 }
 
 export async function showPinLayout(context: vscode.ExtensionContext, options: ShowPinLayoutOptions = {}): Promise<void> {
@@ -132,7 +133,9 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 				void pinsService.refresh();
 			}
 		} else if (message.type === 'openConfig') {
-			void openConfigFile();
+			void openProjectFile(latest && 'configFile' in latest ? latest.configFile : null);
+		} else if (message.type === 'openSysconfig') {
+			void openProjectFile(latest && 'sysconfigFile' in latest ? latest.sysconfigFile : null);
 		} else if (message.type === 'showOutput') {
 			outputChannel.show(true);
 		} else if (message.type === 'selection') {

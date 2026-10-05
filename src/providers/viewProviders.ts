@@ -235,7 +235,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			// The pin layout works for an MSPM0; LibXR code generation is STM32 only.
 			return [
 				chipNode(ctx, state),
-				...peripheralsNodes(state, settingsFile),
+				...peripheralsNodes(state, settingsFile, ctx.root),
 				messageNode('Code generation: STM32 only'),
 			];
 		}
@@ -1080,10 +1080,18 @@ function pinsSummary(used: UsedPeripheral): string {
 	return more > 0 ? `${shown.join(' · ')} · +${more}` : shown.join(' · ');
 }
 
+// A value of a SysConfig setting in one line.
+function settingText(value: unknown): string {
+	return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+}
+
 function peripheralTooltip(used: UsedPeripheral): string {
 	const lines = [`**${used.name}** · ${used.kind}`, ''];
 	for (const pin of used.pins) {
 		lines.push(`- ${pin.function}: \`${pin.pin}\``);
+	}
+	if (used.sysconfig) {
+		lines.push('', `SysConfig: \`${used.sysconfig.name ?? used.sysconfig.module}\``);
 	}
 	if (used.config) {
 		lines.push('', used.config.present ? `Settings: \`${used.config.section}.${used.config.key}\`` : `Not in libxr_config.yaml (\`${used.config.section}.${used.config.key}\`)`);
@@ -1093,8 +1101,17 @@ function peripheralTooltip(used: UsedPeripheral): string {
 
 // A peripheral the project selected. Its settings in libxr_config.yaml are its children and can be
 // edited like the Config File (settingsFile), which regenerates the code.
-function peripheralNode(used: UsedPeripheral, settingsFile?: string): PeripheralNode {
+function peripheralNode(used: UsedPeripheral, settingsFile?: string, sysconfigFile?: string): PeripheralNode {
 	let children: TreeNode[] = [];
+	if (used.sysconfig) {
+		// An MSPM0: the settings are in the SysConfig project and are read-only here; SysConfig edits them.
+		children = Object.entries(used.sysconfig.params).map(([name, value]) =>
+			messageNode(`${name}: ${settingText(value)}`, undefined, { iconId: 'symbol-field' }),
+		);
+		if (sysconfigFile) {
+			children.push(opNode('Open in SysConfig', 'vscode.open', [vscode.Uri.file(sysconfigFile)], path.basename(sysconfigFile), 'go-to-file'));
+		}
+	}
 	if (used.config?.present && settingsFile) {
 		children = toYamlValueNodes(used.config.params ?? {}, 0, settingsFile, [used.config.section, used.config.key], true);
 	} else if (used.config && !used.config.present) {
@@ -1114,7 +1131,7 @@ function peripheralNode(used: UsedPeripheral, settingsFile?: string): Peripheral
 
 // The peripherals the project selected, by category, from the shared `libxr pins` result. Nothing
 // while there is no result (the chip says why).
-function peripheralsNodes(state: PinsState, settingsFile?: string): TreeNode[] {
+function peripheralsNodes(state: PinsState, settingsFile?: string, root?: string): TreeNode[] {
 	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
 	if (!result) {
 		return [];
@@ -1123,6 +1140,7 @@ function peripheralsNodes(state: PinsState, settingsFile?: string): TreeNode[] {
 	if (used.length === 0) {
 		return [messageNode('Peripherals: the project selects none', undefined, { iconId: 'info' })];
 	}
+	const sysconfigFile = root && result.project?.sysconfig_file ? path.join(root, result.project.sysconfig_file) : undefined;
 	const groups = CATEGORY_ORDER.map((category) => {
 		const members = used.filter((peripheral) => peripheral.category === category);
 		// GPIO and system pins are many and rarely what one looks for: they start closed.
@@ -1130,7 +1148,7 @@ function peripheralsNodes(state: PinsState, settingsFile?: string): TreeNode[] {
 			? undefined
 			: groupNode(
 					CATEGORY_TITLES[category],
-					members.map((peripheral) => peripheralNode(peripheral, settingsFile)),
+					members.map((peripheral) => peripheralNode(peripheral, settingsFile, sysconfigFile)),
 					category !== 'gpio' && category !== 'system',
 					String(members.length),
 					{ iconId: CATEGORY_ICONS[category], id: `peripherals:${category}`, color: CATEGORY_COLORS[category] },

@@ -681,6 +681,25 @@
 		return wrap;
 	}
 
+	// The settings of an MSPM0 peripheral in the SysConfig project, read-only: SysConfig edits them.
+	function sysconfigSettings(sysconfig) {
+		const wrap = block('Settings', 'SysConfig' + (sysconfig.name ? ' \u00b7 ' + sysconfig.name : ''));
+		const entries = Object.entries(sysconfig.params || {});
+		if (entries.length === 0) {
+			wrap.append(el('div', 'dim', 'Nothing set: SysConfig uses its defaults.'));
+		}
+		for (const [name, value] of entries) {
+			wrap.append(row(name, typeof value === 'object' ? JSON.stringify(value) : String(value)));
+		}
+		if (data.sysconfigFile) {
+			const open = el('button', 'link', 'Open ' + data.sysconfigFile.split('/').pop());
+			open.title = 'Edit the settings in SysConfig';
+			open.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
+			wrap.append(open);
+		}
+		return wrap;
+	}
+
 	// The title of the inspector: what is selected, a short line about it, and the button that
 	// clears the selection.
 	function header(title, aside, withClear) {
@@ -783,8 +802,16 @@
 		}
 		if (peripheral.config) {
 			wrap.append(settings(peripheral.config));
+		} else if (peripheral.sysconfig) {
+			wrap.append(sysconfigSettings(peripheral.sysconfig));
 		} else if (data.hasProject) {
-			wrap.append(el('div', 'dim', peripheral.used ? 'libxr gen does not generate this peripheral.' : 'The project does not use it.'));
+			if (!peripheral.used) {
+				wrap.append(el('div', 'dim', 'The project does not use it.'));
+			} else if (data.platform === 'stm32') {
+				wrap.append(el('div', 'dim', 'libxr gen does not generate this peripheral.'));
+			} else if (data.sysconfigFile) {
+				wrap.append(el('div', 'dim', 'No settings for it in ' + data.sysconfigFile.split('/').pop() + '.'));
+			}
 		}
 		const pins = block('Pins', 'filled: used · outline: can be used · click one to find it');
 		for (const fn of peripheral.functions) {

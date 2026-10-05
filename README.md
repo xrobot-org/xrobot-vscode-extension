@@ -156,8 +156,9 @@ LibXR 视图自上而下是：芯片（型号、封装、引脚数，展开后�
 封装图：滚轮以光标为中心缩放（窗口窄、图在检查器上方时，滚轮滚动页面，Ctrl+滚轮缩放），按住拖动平移，双击回到完整视图（像 CubeMX）。已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
 左上角的圆点是 1 脚。搜索框按引脚名、信号或外设（如 `usart1 tx`）高亮匹配的引脚，图例可以按类别过滤。点击引脚
 显示它能承载的外设功能（按类别折叠），点击其中的外设名选中该外设。图中列出所有识别出的外设，包括 LibXR 没有对应
-抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装取自 SysConfig 工程（`.syscfg` 的 `--package`，或其 `--board` 对应的 LaunchPad），不用设置；`xrobot.libxr.package` 只用来覆盖它。目前只读；MSPM0 只有引脚布局，
-LibXR 代码生成仅支持 STM32。
+抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装取自 SysConfig 工程（`.syscfg` 的 `--package`，或其 `--board` 对应的 LaunchPad），不用设置；`xrobot.libxr.package` 只用来覆盖它。目前只读；MSPM0 没有 LibXR 代码生成（仅支持 STM32），但外设的设置取自 SysConfig 工程的 `.syscfg`（波特率、中断等），
+在外设下只读显示，"Open in SysConfig" 用 `vscode.open` 打开该文件（装了 TI 的 SysConfig 扩展时由它的编辑器打开），修改在
+SysConfig 里进行。
 
 The LibXR view reads, top to bottom: the chip (part, package and pins; open it for Pin Layout, the source file and the
 system), Peripherals (what the project selected in its `.ioc` or in the `ti_msp_dl_config.h` SysConfig generates, by
@@ -183,8 +184,10 @@ function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the
 box highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend filters by
 category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
 it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). The
-package of an MSPM0 comes from its SysConfig project (the `--package` of the `.syscfg`, or the LaunchPad its `--board` names), so nothing is set; the `xrobot.libxr.package` setting only overrides it. The panel is read-only for now; an MSPM0 has the pin layout
-only, and LibXR code generation is STM32 only.
+package of an MSPM0 comes from its SysConfig project (the `--package` of the `.syscfg`, or the LaunchPad its `--board` names), so nothing is set; the `xrobot.libxr.package` setting only overrides it. The panel is read-only for now; an MSPM0 has no LibXR code generation (STM32 only), but the settings of
+its peripherals come from the `.syscfg` of the SysConfig project (baud rate, interrupts, ...) and are shown read-only under
+the peripheral; "Open in SysConfig" opens that file with `vscode.open` (an editor registered for it, such as TI's SysConfig
+extension, takes it), and the settings are edited in SysConfig.
 
 ---
 

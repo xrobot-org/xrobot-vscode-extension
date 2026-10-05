@@ -21,6 +21,14 @@ export type PinsConfig = {
 	params?: Record<string, unknown>;
 };
 
+// The settings of an MSPM0 peripheral in the SysConfig project (the .syscfg), read-only.
+export type PinsSysconfig = {
+	// The SysConfig module (UART, SPI, ...) and the name given to the instance (UART_0).
+	module: string;
+	name: string | null;
+	params: Record<string, unknown>;
+};
+
 export type PinsPin = {
 	position: string;
 	name: string;
@@ -45,12 +53,15 @@ export type PinsUsed = {
 	// Function -> the pin it uses in the project.
 	pins: Record<string, string>;
 	config?: PinsConfig;
+	sysconfig?: PinsSysconfig;
 };
 
 export type PinsProject = {
 	directory: string;
 	source: string;
 	libxr_config: string | null;
+	// The .syscfg the settings were read from, relative to the project (an MSPM0).
+	sysconfig_file?: string | null;
 	assignments: Record<string, PinsAssignment>;
 	peripherals: Record<string, PinsUsed>;
 };
