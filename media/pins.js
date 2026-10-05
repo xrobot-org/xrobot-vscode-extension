@@ -22,8 +22,10 @@
 	const CATEGORY_NAMES = Object.fromEntries(LEGEND);
 
 	let data;
-	// null fits the package to the window; a number is a zoom the user chose.
-	let zoom = null;
+	// The part of the package that is shown (the SVG viewBox): null fits the whole package. The
+	// wheel zooms around the pointer, a drag pans, a double click fits again.
+	let box = null;
+	let dragged = false;
 	let query = '';
 	let showFunctions = true;
 	const filters = new Set();
@@ -144,12 +146,16 @@
 			});
 			tools.append(label);
 		}
-		for (const [text, factor, title] of [['−', 0.8, 'Zoom out'], ['+', 1.25, 'Zoom in'], ['Fit', 0, 'Fit to the window']]) {
+		for (const [text, factor, title] of [['−', 1 / 1.4, 'Zoom out'], ['+', 1.4, 'Zoom in'], ['Fit', 0, 'Fit to the window (double click)']]) {
 			const button = el('button', undefined, text);
 			button.title = title;
 			button.addEventListener('click', () => {
-				zoom = factor === 0 ? null : Math.min(5, Math.max(0.3, (zoom === null ? currentScale() : zoom) * factor));
-				drawPackage();
+				if (factor === 0) {
+					fit();
+				} else {
+					const current = shownBox();
+					zoomAt(factor, current.x + current.w / 2, current.y + current.h / 2);
+				}
 			});
 			tools.append(button);
 		}
@@ -190,12 +196,80 @@
 
 	// ---- package ------------------------------------------------------------------------------
 
-	function currentScale() {
-		const g = data.geometry;
-		const host = document.getElementById('package');
-		const width = host ? host.clientWidth - 4 : 600;
-		const height = Math.max(300, window.innerHeight - 190);
-		return Math.min(width / g.width, height / g.height, 1.6);
+	// ---- zoom and pan -------------------------------------------------------------------------
+
+	function wholeBox() {
+		return { x: 0, y: 0, w: data.geometry.width, h: data.geometry.height };
+	}
+
+	function shownBox() {
+		return box || wholeBox();
+	}
+
+	function applyBox() {
+		const canvas = document.querySelector('#package svg');
+		const shown = shownBox();
+		canvas.setAttribute('viewBox', `${shown.x} ${shown.y} ${shown.w} ${shown.h}`);
+	}
+
+	function fit() {
+		box = null;
+		applyBox();
+	}
+
+	// Zooms by factor around the point (cx, cy) of the drawing, which stays where it is on screen.
+	function zoomAt(factor, cx, cy) {
+		const whole = wholeBox();
+		const shown = shownBox();
+		const w = Math.min(whole.w * 1.2, Math.max(whole.w / 14, shown.w / factor));
+		const scale = w / shown.w;
+		box = { x: cx - (cx - shown.x) * scale, y: cy - (cy - shown.y) * scale, w, h: shown.h * scale };
+		applyBox();
+	}
+
+	// The point of the drawing under a mouse event.
+	function drawingPoint(canvas, event) {
+		const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(canvas.getScreenCTM().inverse());
+		return { x: point.x, y: point.y };
+	}
+
+	function enableZoomAndPan(canvas, host) {
+		canvas.addEventListener(
+			'wheel',
+			(event) => {
+				event.preventDefault();
+				const at = drawingPoint(canvas, event);
+				zoomAt(event.deltaY < 0 ? 1.18 : 1 / 1.18, at.x, at.y);
+			},
+			{ passive: false },
+		);
+		canvas.addEventListener('dblclick', fit);
+		canvas.addEventListener('pointerdown', (event) => {
+			if (event.button !== 0) {
+				return;
+			}
+			const start = { x: event.clientX, y: event.clientY, box: { ...shownBox() } };
+			const unit = 1 / canvas.getScreenCTM().a;
+			dragged = false;
+			const move = (next) => {
+				const dx = next.clientX - start.x;
+				const dy = next.clientY - start.y;
+				if (!dragged && Math.hypot(dx, dy) < 4) {
+					return;
+				}
+				dragged = true;
+				host.classList.add('dragging');
+				box = { ...start.box, x: start.box.x - dx * unit, y: start.box.y - dy * unit };
+				applyBox();
+			};
+			const stop = () => {
+				window.removeEventListener('pointermove', move);
+				window.removeEventListener('pointerup', stop);
+				host.classList.remove('dragging');
+			};
+			window.addEventListener('pointermove', move);
+			window.addEventListener('pointerup', stop);
+		});
 	}
 
 	function shortLabel(text, max) {
@@ -233,8 +307,8 @@
 		const host = document.getElementById('package');
 		host.replaceChildren();
 		const g = data.geometry;
-		const scale = zoom === null ? currentScale() : zoom;
-		const canvas = svg('svg', { viewBox: `0 0 ${g.width} ${g.height}`, width: g.width * scale, height: g.height * scale });
+		const shown = shownBox();
+		const canvas = svg('svg', { viewBox: `${shown.x} ${shown.y} ${shown.w} ${shown.h}`, width: '100%', height: '100%' });
 		canvas.append(svg('rect', { class: 'body', x: g.body.x, y: g.body.y, width: g.body.width, height: g.body.height, rx: 4 }));
 		canvas.append(svg('circle', { class: 'pin1', cx: g.marker.x, cy: g.marker.y, r: 3.2 }));
 		canvas.append(svg('text', { class: 'chip', x: g.body.x + g.body.width / 2, y: g.body.y + g.body.height / 2, 'text-anchor': 'middle' }, data.title));
@@ -246,12 +320,18 @@
 			group.append(svg('rect', { x: cell.x, y: cell.y, width: cell.width, height: cell.height, rx: 1.5 }));
 			group.append(labelFor(cell));
 			group.addEventListener('click', () => {
+				// A drag that ends on a pin is not a click on it.
+				if (dragged) {
+					dragged = false;
+					return;
+				}
 				selectedPosition = cell.position;
 				restyle();
 				drawSide();
 			});
 			canvas.append(group);
 		}
+		enableZoomAndPan(canvas, host);
 		host.append(canvas);
 		restyle();
 	}
@@ -465,15 +545,6 @@
 		} else if (message.error !== undefined) {
 			show({ error: message.error });
 		}
-	});
-	let resizeTimer;
-	window.addEventListener('resize', () => {
-		clearTimeout(resizeTimer);
-		resizeTimer = setTimeout(() => {
-			if (data && !data.error && zoom === null) {
-				drawPackage();
-			}
-		}, 120);
 	});
 	vscode.postMessage({ type: 'ready' });
 })();
