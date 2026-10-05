@@ -15,6 +15,15 @@ export type ShowPinLayoutOptions = {
 	peripheral?: string;
 };
 
+// Told which peripheral the panel's selection involves (null: none), so the sidebar can follow.
+type SelectionHandler = (peripheral: string | null) => void;
+
+let selectionHandler: SelectionHandler | undefined;
+
+export function onPanelSelection(handler: SelectionHandler): void {
+	selectionHandler = handler;
+}
+
 let panel: vscode.WebviewPanel | undefined;
 let latest: PanelData | undefined;
 let pendingPeripheral: string | undefined;
@@ -111,7 +120,7 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 		retainContextWhenHidden: true,
 	});
 	panel.webview.html = pageHtml(panel.webview, context.extensionUri);
-	panel.webview.onDidReceiveMessage((message: { type?: string }) => {
+	panel.webview.onDidReceiveMessage((message: { type?: string; peripheral?: unknown }) => {
 		if (message.type === 'ready') {
 			// The page loaded: give it what is known, and compute again for a first open.
 			if (pinsService.state.status === 'ok' || pinsService.state.status === 'error') {
@@ -122,6 +131,8 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 			}
 		} else if (message.type === 'openConfig') {
 			void openConfigFile();
+		} else if (message.type === 'selection') {
+			selectionHandler?.(typeof message.peripheral === 'string' ? message.peripheral : null);
 		}
 	});
 	subscription = pinsService.onDidChange((state) => show(state));

@@ -141,6 +141,38 @@ type WorkspaceContext = {
 export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private readonly onDidChangeEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 	public readonly onDidChangeTreeData = this.onDidChangeEmitter.event;
+	// The Peripherals group and its items of the last build, so one can be revealed.
+	private peripheralsGroup: GroupNode | undefined;
+	private readonly peripheralItems = new Map<string, PeripheralNode>();
+
+	getParent(element: TreeNode): TreeNode | undefined {
+		return element.type === 'peripheral' ? this.peripheralsGroup : undefined;
+	}
+
+	// Selects the item of a peripheral in the tree (the panel selected it); the item's click
+	// command is not run. Nothing happens while the view is hidden.
+	revealPeripheral(view: vscode.TreeView<TreeNode>, name: string | null): void {
+		const node = name ? this.peripheralItems.get(name) : undefined;
+		if (!node || !view.visible) {
+			return;
+		}
+		void Promise.resolve(view.reveal(node, { select: true, focus: false, expand: false })).then(undefined, () => undefined);
+	}
+
+	private indexPeripherals(root: TreeNode[]): void {
+		this.peripheralsGroup = undefined;
+		this.peripheralItems.clear();
+		for (const node of root) {
+			if (node.type === 'group' && node.label === 'Peripherals') {
+				this.peripheralsGroup = node;
+				for (const child of node.children) {
+					if (child.type === 'peripheral') {
+						this.peripheralItems.set(child.peripheral, child);
+					}
+				}
+			}
+		}
+	}
 
 	refresh(): void {
 		this.onDidChangeEmitter.fire(undefined);
@@ -157,7 +189,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		}
 
 		if (!element) {
-			return this.buildRoot(ctx);
+			const root = this.buildRoot(ctx);
+			this.indexPeripherals(root);
+			return root;
 		}
 
 		if (element.type === 'group' || element.type === 'peripheral') {

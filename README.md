@@ -146,7 +146,12 @@ LibXR 视图中的 "Pin Layout" 打开芯片的封装图（`libxr pins`，需要
 `.ioc`（STM32）或 SysConfig 生成的 `ti_msp_dl_config.h`（MSPM0）中已选的外设：引脚、已配置或未配置，以及它在
 `libxr_config.yaml` 中的段和当前参数。点击一个外设会打开封装图并选中它：它每个功能当前用的引脚和其他可选的引脚。
 
-封装图：已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
+面板和侧栏联动：同一时间只选中一件事，要么一个引脚，要么一个外设。点封装图上的引脚，右侧显示这个引脚、项目里用作什么、
+它还能是什么；点其中的外设名（或侧栏 Peripherals 里的一项），右侧改显示这个外设：设置，以及它每个功能的引脚，封装图上
+当前用的引脚为实线、其他候选为虚线，点引脚名在封装图上定位。在面板里选中外设（或点一个已选的引脚），侧栏里对应的外设
+也被选中。
+
+封装图：滚轮以光标为中心缩放，按住拖动平移，双击回到完整视图（像 CubeMX）。已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
 左上角的圆点是 1 脚。搜索框按引脚名、信号或外设（如 `usart1 tx`）高亮匹配的引脚，图例可以按类别过滤。点击引脚
 显示它能承载的外设功能（按类别折叠），点击其中的外设名选中该外设。图中列出所有识别出的外设，包括 LibXR 没有对应
 抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装用设置 `xrobot.libxr.package` 给出。目前只读；MSPM0 只有引脚布局，
@@ -157,6 +162,14 @@ command); "Peripherals" lists what the project selected in its `.ioc` (STM32) or
 generates (MSPM0): the pins, configured or not, and its section in `libxr_config.yaml` with the current parameters.
 Clicking a peripheral opens the drawing with it selected: the pin each of its functions uses and the other pins that can
 carry it.
+
+The panel and the sidebar follow each other, and one thing is selected at a time: a pin or a peripheral. Click a pin on the
+drawing and the inspector shows the pin, what the project uses it as and what else it can be; click a peripheral name there
+(or an item of the Peripherals group in the sidebar) and the inspector shows the peripheral: its settings and the pins of each
+function, drawn solid for the pin in use and dashed for the other candidates; click a pin name to find it on the drawing.
+Selecting a peripheral in the panel (or clicking a pin the project uses) selects it in the sidebar too.
+
+The wheel zooms around the pointer, a drag pans and a double click shows the whole package again, as in CubeMX.
 
 In the drawing the selected pins are coloured by peripheral category and labelled with the pin name and the selected
 function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the top-left corner marks pin 1. The search

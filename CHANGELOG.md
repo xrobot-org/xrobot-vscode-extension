@@ -11,6 +11,11 @@
   1. The search box and the legend highlight and filter pins; clicking a pin lists the
   peripheral functions it can carry, and selecting a peripheral shows every pin that can
   carry each of its functions. Read-only. Needs a libxr release that has `libxr pins`.
+- The panel zooms with the wheel around the pointer, pans with a drag and fits with a double
+  click. The inspector shows one selection at a time, a pin or a peripheral, in plain
+  sections (what the project uses it as, what else it can be, its settings and pins).
+  Selecting a peripheral in the panel selects it in the Peripherals group, and the other
+  way round.
 - The LibXR view has a Peripherals group: the peripherals the project selected, with their
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.

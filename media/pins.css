@@ -121,3 +121,24 @@ button.link.peripheral { font-weight: 600; padding: 0 4px 0 0; min-width: 5em; t
 	aside { flex: none; width: 100%; }
 	.package { flex: none; width: 100%; height: 70vh; }
 }
+
+/* inspector: one selection at a time */
+.inspector-head { display: flex; gap: 8px; align-items: baseline; margin: 4px 0 6px; }
+.inspector-head h2 { margin: 0; }
+.inspector-head button.link { margin-left: auto; font-size: 1.3em; line-height: 1; padding: 0 4px; }
+.block { margin: 12px 0 4px; }
+.block h4 { margin: 0 0 4px; font-weight: 600; }
+.block .hint { font-weight: 400; color: var(--vscode-descriptionForeground); font-size: 0.9em; }
+.usedas { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+.usedas.mismatch { border-left: 3px solid var(--vscode-errorForeground); padding-left: 6px; }
+button.peripheral-link { background: none; color: var(--vscode-textLink-foreground); font-weight: 600; padding: 0; }
+button.peripheral-link:hover { text-decoration: underline; }
+.can { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
+.can .cat { flex: 0 0 6.5em; font-weight: 600; color: var(--other); }
+.can.cat-comm .cat { color: var(--comm); } .can.cat-timer .cat { color: var(--timer); }
+.can.cat-analog .cat { color: var(--analog); } .can.cat-gpio .cat { color: var(--gpio); }
+.can.cat-system .cat { color: var(--system); } .can.cat-memory .cat { color: var(--memory); }
+.can .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.can .chip-fn { background: none; color: var(--vscode-foreground); cursor: pointer; padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
+.can .chip-fn:hover { border-color: var(--vscode-focusBorder); }
+svg .cell.located rect { stroke: var(--vscode-errorForeground, #f14c4c); stroke-width: 3; }

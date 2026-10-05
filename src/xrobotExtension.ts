@@ -4,6 +4,7 @@ import { registerXrobotCommands } from './commands/commandHandlers';
 import { checkDependencies } from './commands/xrobotCommands';
 import { initCliHost, outputChannel } from './cliHost';
 import { pinsService } from './pinsService';
+import { onPanelSelection } from './providers/pinView';
 
 // File events arrive in bursts (a CLI rewrites several files); one refresh per burst
 // avoids starting and cancelling several `xrobot describe` runs.
@@ -31,8 +32,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	};
 	context.subscriptions.push({ dispose: () => timer && clearTimeout(timer) });
 
+	const libxrView = vscode.window.createTreeView('xrobot.libxrView', { treeDataProvider: libxrProvider, showCollapseAll: true });
+	// What is selected in the pin layout panel is selected in the Peripherals group too.
+	onPanelSelection((name) => libxrProvider.revealPeripheral(libxrView, name));
 	context.subscriptions.push(
-		vscode.window.createTreeView('xrobot.libxrView', { treeDataProvider: libxrProvider, showCollapseAll: true }),
+		libxrView,
 		vscode.window.createTreeView('xrobot.xrobotView', { treeDataProvider: xrobotProvider, showCollapseAll: true }),
 	);
 

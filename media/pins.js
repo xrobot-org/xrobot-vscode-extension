@@ -31,6 +31,8 @@
 	const filters = new Set();
 	let selectedPosition;
 	let selectedPeripheral;
+	// A pin the user asked to find (from a peripheral's pin list); the selection does not change.
+	let locatedPosition;
 	let pendingPeripheral;
 	let searchText = new Map();
 
@@ -325,9 +327,7 @@
 					dragged = false;
 					return;
 				}
-				selectedPosition = cell.position;
-				restyle();
-				drawSide();
+				selectPin(cell.position);
 			});
 			canvas.append(group);
 		}
@@ -347,10 +347,60 @@
 			const mark = candidates.get(position);
 			group.classList.toggle('dimmed', !hit || (candidates.size > 0 && !mark && !searching));
 			group.classList.toggle('selected', position === selectedPosition);
+			group.classList.toggle('located', position === locatedPosition);
 			group.classList.toggle('candidate', mark === 'candidate');
 			group.classList.toggle('current', mark === 'current');
 			group.classList.toggle('match', searching && hit);
 		}
+	}
+
+	// ---- selection ----------------------------------------------------------------------------
+	//
+	// One thing is selected at a time: a pin (clicked on the drawing) or a peripheral (chosen in the
+	// sidebar or by a peripheral name here). The inspector shows that one thing; the drawing
+	// highlights it; the sidebar follows (the extension is told which peripheral is involved).
+
+	function announce(peripheral) {
+		vscode.postMessage({ type: 'selection', peripheral: peripheral || null });
+	}
+
+	function selectPin(position) {
+		selectedPosition = position;
+		selectedPeripheral = undefined;
+		locatedPosition = undefined;
+		const detail = data.details[position];
+		const assigned = detail && detail.entries.map((entry) => entry.assigned).find(Boolean);
+		restyle();
+		drawSide();
+		announce(assigned && assigned.peripheral);
+	}
+
+	function selectPeripheral(name) {
+		selectedPeripheral = name;
+		selectedPosition = undefined;
+		locatedPosition = undefined;
+		restyle();
+		drawSide();
+		announce(name);
+	}
+
+	function clearSelection() {
+		selectedPosition = undefined;
+		selectedPeripheral = undefined;
+		locatedPosition = undefined;
+		restyle();
+		drawSide();
+	}
+
+	// Brings a pin into view on the drawing and rings it, without changing the selection.
+	function locate(position) {
+		locatedPosition = position;
+		const cell = data.geometry.cells.find((candidate) => candidate.position === position);
+		if (cell && box) {
+			box = { ...box, x: cell.x + cell.width / 2 - box.w / 2, y: cell.y + cell.height / 2 - box.h / 2 };
+			applyBox();
+		}
+		restyle();
 	}
 
 	// ---- inspector ----------------------------------------------------------------------------
@@ -361,158 +411,158 @@
 		return line;
 	}
 
-	function paramsTable(config) {
-		const box = el('div', 'config');
-		box.append(el('div', 'row head', `${config.section}.${config.key}`));
+	function block(title, hint) {
+		const wrap = el('div', 'block');
+		const heading = el('h4', undefined, title);
+		if (hint) {
+			heading.append(el('span', 'hint', ' ' + hint));
+		}
+		wrap.append(heading);
+		return wrap;
+	}
+
+	// The settings of a peripheral in libxr_config.yaml.
+	function settings(config) {
+		const wrap = block('Settings', config.section + '.' + config.key + ' in libxr_config.yaml');
 		if (!config.present) {
-			box.append(el('div', 'row dim', 'not in libxr_config.yaml'));
+			wrap.append(el('div', 'dim', 'Not in libxr_config.yaml yet.'));
 		} else {
 			for (const [name, value] of Object.entries(config.params || {})) {
-				box.append(row(name, typeof value === 'object' ? JSON.stringify(value) : String(value)));
+				wrap.append(row(name, typeof value === 'object' ? JSON.stringify(value) : String(value)));
 			}
 		}
 		if (data.configFile) {
 			const open = el('button', 'link', 'Open libxr_config.yaml');
 			open.addEventListener('click', () => vscode.postMessage({ type: 'openConfig' }));
-			box.append(open);
-		}
-		return box;
-	}
-
-	function selectPeripheral(name) {
-		selectedPeripheral = selectedPeripheral === name ? undefined : name;
-		restyle();
-		drawSide();
-	}
-
-	function peripheralLink(name, className) {
-		const link = el('button', `link ${className || ''}`, name);
-		link.title = 'Show its functions and the pins that can carry them';
-		link.addEventListener('click', () => selectPeripheral(name));
-		return link;
-	}
-
-	// The functions a pin can carry, by category; the category of the selected signal is open.
-	function canBe(entry) {
-		const wrap = el('div', 'canbe');
-		const groups = new Map();
-		for (const fn of entry.functions) {
-			groups.set(fn.category, [...(groups.get(fn.category) || []), fn]);
-		}
-		const order = LEGEND.map(([key]) => key).filter((key) => groups.has(key));
-		const total = entry.functions.length;
-		const assignedCategory = entry.assigned && data.peripherals[entry.assigned.peripheral] && data.peripherals[entry.assigned.peripheral].category;
-		for (const category of order) {
-			const functions = groups.get(category);
-			const details = el('details');
-			details.open = total <= 6 || category === assignedCategory;
-			details.append(el('summary', `cat-${category}`, `${CATEGORY_NAMES[category]} (${functions.length})`));
-			const byPeripheral = new Map();
-			for (const fn of functions) {
-				byPeripheral.set(fn.peripheral, [...(byPeripheral.get(fn.peripheral) || []), fn]);
-			}
-			for (const [peripheral, list] of byPeripheral) {
-				const line = el('div', `fn cat-${category}`);
-				line.append(peripheralLink(peripheral, 'peripheral'));
-				for (const fn of list) {
-					const mode = entry.modes && entry.modes[`${peripheral}.${fn.function}`];
-					line.append(el('span', 'chip-fn', mode === undefined ? fn.function : `${fn.function} (${mode})`));
-				}
-				details.append(line);
-			}
-			wrap.append(details);
+			wrap.append(open);
 		}
 		return wrap;
 	}
 
-	function drawEntry(entry) {
-		const box = el('section', 'entry');
-		box.append(el('h3', undefined, entry.name));
-		box.append(row('type', entry.type));
-		if (entry.gpioModes.length > 0) {
-			box.append(row('GPIO', entry.gpioModes.join(', ')));
+	function header(title, badge) {
+		const head = el('div', 'inspector-head');
+		head.append(el('h2', undefined, title));
+		if (badge) {
+			head.append(badge);
 		}
-		if (entry.iomuxPincm !== undefined) {
-			box.append(row('IOMUX', `PINCM${entry.iomuxPincm}`));
-		}
-		if (entry.assigned) {
-			const a = entry.assigned;
-			const selected = el('div', `selected-signal${a.matched ? '' : ' mismatch'}`);
-			selected.append(el('strong', undefined, 'Selected: '), document.createTextNode(`${a.signal} → `), peripheralLink(a.peripheral), document.createTextNode(` ${a.function}`));
-			if (a.label) {
-				selected.append(el('div', 'dim', `label ${a.label}`));
-			}
-			if (!a.matched) {
-				selected.append(el('div', 'dim', 'not a signal of this pin'));
-			}
-			if (a.candidates) {
-				selected.append(el('div', 'dim', `could be ${a.candidates.join(', ')}`));
-			}
-			box.append(selected);
-			const peripheral = data.peripherals[a.peripheral];
-			if (peripheral && peripheral.config) {
-				box.append(paramsTable(peripheral.config));
-			}
-		}
-		if (entry.functions.length > 0) {
-			box.append(el('h4', undefined, 'Can be'), canBe(entry));
-		}
-		return box;
+		const clear = el('button', 'link', '\u00d7');
+		clear.title = 'Clear the selection';
+		clear.addEventListener('click', clearSelection);
+		head.append(clear);
+		return head;
 	}
 
-	function drawPeripheral(name) {
+	function pinView(detail) {
+		const wrap = el('div');
+		wrap.append(header('Pin ' + detail.position));
+		for (const entry of detail.entries) {
+			const section = el('section', 'entry');
+			section.append(el('h3', undefined, entry.name));
+			const facts = [entry.type];
+			if (entry.gpioModes.length > 0) {
+				facts.push('GPIO: ' + entry.gpioModes.join(', '));
+			}
+			if (entry.iomuxPincm !== undefined) {
+				facts.push('IOMUX PINCM' + entry.iomuxPincm);
+			}
+			section.append(el('div', 'dim', facts.join(' \u00b7 ')));
+
+			if (data.hasProject) {
+				const used = block('Used by the project as');
+				if (entry.assigned) {
+					const a = entry.assigned;
+					const line = el('div', 'usedas' + (a.matched ? '' : ' mismatch'));
+					const name = el('button', 'peripheral-link', a.peripheral + ' \u00b7 ' + a.function);
+					name.title = 'Show ' + a.peripheral + ': its settings and every pin it can use';
+					name.addEventListener('click', () => selectPeripheral(a.peripheral));
+					line.append(name, el('span', 'dim', ' (' + a.signal + ')'));
+					used.append(line);
+					if (a.label) {
+						used.append(el('div', 'dim', 'GPIO label: ' + a.label));
+					}
+					if (!a.matched) {
+						used.append(el('div', 'dim', 'This is not a signal of this pin.'));
+					}
+					if (a.candidates) {
+						used.append(el('div', 'dim', 'Could be ' + a.candidates.join(' or ') + '.'));
+					}
+				} else {
+					used.append(el('div', 'dim', 'Nothing: the project does not use this pin.'));
+				}
+				section.append(used);
+			}
+
+			const can = block('This pin can be', 'click one to see that peripheral');
+			const groups = new Map();
+			for (const fn of entry.functions) {
+				groups.set(fn.category, (groups.get(fn.category) || []).concat([fn]));
+			}
+			for (const [category] of LEGEND) {
+				const functions = groups.get(category);
+				if (!functions) {
+					continue;
+				}
+				const line = el('div', 'can cat-' + category);
+				line.append(el('span', 'cat', CATEGORY_NAMES[category]));
+				const chips = el('span', 'chips');
+				for (const fn of functions) {
+					const mode = entry.modes && entry.modes[fn.peripheral + '.' + fn.function];
+					const chip = el('button', 'chip-fn', fn.peripheral + ' ' + fn.function + (mode === undefined ? '' : ' (' + mode + ')'));
+					chip.title = 'Show ' + fn.peripheral;
+					chip.addEventListener('click', () => selectPeripheral(fn.peripheral));
+					chips.append(chip);
+				}
+				line.append(chips);
+				can.append(line);
+			}
+			if (entry.functions.length === 0) {
+				can.append(el('div', 'dim', 'No peripheral function.'));
+			}
+			section.append(can);
+			wrap.append(section);
+		}
+		return wrap;
+	}
+
+	function peripheralView(name) {
 		const peripheral = data.peripherals[name];
-		const box = el('section', 'entry peripheral-inspector');
-		const title = el('h3');
-		title.append(document.createTextNode(`${name} `), el('span', `kind cat-${peripheral.category}`, peripheral.kind));
-		const clear = el('button', 'link', '×');
-		clear.title = 'Clear';
-		clear.addEventListener('click', () => selectPeripheral(name));
-		title.append(clear);
-		box.append(title);
+		const wrap = el('div');
+		wrap.append(header(name, el('span', 'kind cat-' + peripheral.category, peripheral.kind)));
 		if (peripheral.capabilities.length > 0) {
-			box.append(row('can', peripheral.capabilities.join(', ')));
+			wrap.append(el('div', 'dim', 'Can be used for: ' + peripheral.capabilities.join(', ')));
 		}
 		if (peripheral.config) {
-			box.append(paramsTable(peripheral.config));
+			wrap.append(settings(peripheral.config));
+		} else if (data.hasProject) {
+			wrap.append(el('div', 'dim', peripheral.used ? 'libxr gen does not generate this peripheral.' : 'The project does not use it.'));
 		}
-		const table = el('div', 'functions');
+		const pins = block('Pins', 'filled: used by the project \u00b7 outline: can also be used \u00b7 click one to find it');
 		for (const fn of peripheral.functions) {
 			const line = el('div', 'function');
 			line.append(el('span', 'fname', fn.function));
-			const pins = el('span', 'fpins');
+			const chips = el('span', 'fpins');
 			for (const pin of fn.pins) {
-				const chip = el('button', `pinchip${fn.current === pin ? ' current' : ''}`, pin.replace(/\(.*$/, ''));
-				chip.title = `${data.positions[pin]}: ${pin}`;
-				chip.addEventListener('click', () => {
-					selectedPosition = data.positions[pin];
-					restyle();
-					drawSide();
-				});
-				pins.append(chip);
+				const chip = el('button', 'pinchip' + (fn.current === pin ? ' current' : ''), pin.replace(/\(.*$/, ''));
+				chip.title = 'Pin ' + data.positions[pin] + ': ' + pin;
+				chip.addEventListener('click', () => locate(data.positions[pin]));
+				chips.append(chip);
 			}
-			line.append(pins);
-			table.append(line);
+			line.append(chips);
+			pins.append(line);
 		}
-		box.append(table);
-		return box;
+		wrap.append(pins);
+		return wrap;
 	}
 
 	function drawSide() {
 		const side = document.getElementById('side');
 		side.replaceChildren();
-		const detail = selectedPosition && data.details[selectedPosition];
-		if (detail) {
-			side.append(el('h2', undefined, `Pin ${detail.position}`));
-			for (const entry of detail.entries) {
-				side.append(drawEntry(entry));
-			}
-		}
 		if (selectedPeripheral && data.peripherals[selectedPeripheral]) {
-			side.append(el('h2', undefined, 'Peripheral'), drawPeripheral(selectedPeripheral));
-		}
-		if (!detail && !selectedPeripheral) {
-			side.append(el('p', 'dim', 'Click a pin, or search for a signal.'));
+			side.append(peripheralView(selectedPeripheral));
+		} else if (selectedPosition && data.details[selectedPosition]) {
+			side.append(pinView(data.details[selectedPosition]));
+		} else {
+			side.append(el('p', 'dim', 'Click a pin on the drawing, or choose a peripheral in the sidebar.'));
 		}
 		side.append(el('p', 'dim source', data.source));
 	}
@@ -520,9 +570,18 @@
 	// ---- messages -----------------------------------------------------------------------------
 
 	function show(next) {
+		// A refresh of the same chip keeps what is selected.
+		const sameChip = data && !data.error && next && !next.error && data.title === next.title && data.subtitle === next.subtitle;
+		const keepPin = sameChip ? selectedPosition : undefined;
+		const keepPeripheral = sameChip ? selectedPeripheral : undefined;
 		data = next;
-		selectedPosition = undefined;
-		selectedPeripheral = pendingPeripheral && data.peripherals && data.peripherals[pendingPeripheral] ? pendingPeripheral : undefined;
+		selectedPosition = keepPin && data.details && data.details[keepPin] ? keepPin : undefined;
+		selectedPeripheral = keepPeripheral && data.peripherals && data.peripherals[keepPeripheral] ? keepPeripheral : undefined;
+		if (pendingPeripheral && data.peripherals && data.peripherals[pendingPeripheral]) {
+			selectedPeripheral = pendingPeripheral;
+			selectedPosition = undefined;
+		}
+		locatedPosition = undefined;
 		pendingPeripheral = undefined;
 		if (!data.error) {
 			buildSearchText();
@@ -536,7 +595,10 @@
 			show(message.data);
 		} else if (message.type === 'select' && message.peripheral) {
 			if (data && !data.error && data.peripherals[message.peripheral]) {
+				// From the sidebar, which already shows it selected: not announced back.
 				selectedPeripheral = message.peripheral;
+				selectedPosition = undefined;
+				locatedPosition = undefined;
 				restyle();
 				drawSide();
 			} else {
