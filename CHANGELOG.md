@@ -16,6 +16,15 @@
   sections (what the project uses it as, what else it can be, its settings and pins).
   Selecting a peripheral in the panel selects it in the Peripherals group, and the other
   way round.
+- The LibXR view starts with the chip (part, package, pins; Pin Layout, the source file and the
+  system below it), and the Peripherals group sorts what the project selected by category, with
+  coloured icons, a tooltip with the pins, and the settings as children that can be edited like
+  the Config File. GPIO and system start closed.
+- The panel: a zoom percentage, a search that Enter steps through, a Show functions toggle,
+  a legend that filters by category (shown with a project only), keyboard navigation, a loading
+  and an updating indicator, an error box with the CLI message and a link to the output, and the
+  zoom, search and selection kept when the panel is hidden. In a narrow window the wheel scrolls
+  the page (Ctrl+wheel zooms) and selecting a peripheral in the sidebar zooms to its pins.
 - The LibXR view has a Peripherals group: the peripherals the project selected, with their
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.

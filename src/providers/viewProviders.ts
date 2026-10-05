@@ -51,12 +51,16 @@ export type TreeNode = GroupNode | FileNode | YamlValueNode | ActionNode | UrlNo
 
 type GroupNode = {
 	type: 'group';
+	// Keeps the item (and whether it is open) across refreshes.
+	id?: string;
 	label: string;
 	children: TreeNode[];
 	expanded?: boolean;
 	description?: string;
 	iconId?: string;
 	tooltip?: string;
+	// A theme colour id for the icon.
+	color?: string;
 };
 
 type FileNode = {
@@ -116,6 +120,8 @@ type PeripheralNode = {
 	type: 'peripheral';
 	label: string;
 	description: string;
+	// Markdown: the pins and where the settings are.
+	tooltip: string;
 	category: Category;
 	peripheral: string;
 	children: TreeNode[];
@@ -141,12 +147,12 @@ type WorkspaceContext = {
 export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private readonly onDidChangeEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 	public readonly onDidChangeTreeData = this.onDidChangeEmitter.event;
-	// The Peripherals group and its items of the last build, so one can be revealed.
-	private peripheralsGroup: GroupNode | undefined;
+	// The parents of the nodes of the last build and the peripheral items, so one can be revealed.
+	private readonly parents = new Map<TreeNode, TreeNode>();
 	private readonly peripheralItems = new Map<string, PeripheralNode>();
 
 	getParent(element: TreeNode): TreeNode | undefined {
-		return element.type === 'peripheral' ? this.peripheralsGroup : undefined;
+		return this.parents.get(element);
 	}
 
 	// Selects the item of a peripheral in the tree (the panel selected it); the item's click
@@ -159,17 +165,16 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		void Promise.resolve(view.reveal(node, { select: true, focus: false, expand: false })).then(undefined, () => undefined);
 	}
 
-	private indexPeripherals(root: TreeNode[]): void {
-		this.peripheralsGroup = undefined;
-		this.peripheralItems.clear();
-		for (const node of root) {
-			if (node.type === 'group' && node.label === 'Peripherals') {
-				this.peripheralsGroup = node;
-				for (const child of node.children) {
-					if (child.type === 'peripheral') {
-						this.peripheralItems.set(child.peripheral, child);
-					}
-				}
+	private indexTree(nodes: TreeNode[], parent?: TreeNode): void {
+		for (const node of nodes) {
+			if (parent) {
+				this.parents.set(node, parent);
+			}
+			if (node.type === 'peripheral') {
+				this.peripheralItems.set(node.peripheral, node);
+			}
+			if (node.type === 'group' || node.type === 'peripheral') {
+				this.indexTree(node.children, node);
 			}
 		}
 	}
@@ -190,7 +195,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		if (!element) {
 			const root = this.buildRoot(ctx);
-			this.indexPeripherals(root);
+			this.parents.clear();
+			this.peripheralItems.clear();
+			this.indexTree(root);
 			return root;
 		}
 
@@ -209,6 +216,9 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return [];
 	}
 
+	// The LibXR view, top to bottom: the chip (its pin layout, source file and system), what the
+	// project uses (the peripherals, with their settings), then the Flash layout, the files and the
+	// actions. The chip and the peripherals come from the shared `libxr pins` result.
 	private buildRoot(ctx: WorkspaceContext): TreeNode[] {
 		if (ctx.platform === 'unknown') {
 			return [
@@ -217,31 +227,23 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 				),
 			];
 		}
+		const state = pinsService.state;
+		// The settings of a peripheral are edited in libxr_config.yaml (an STM32 only).
+		const settingsFile = ctx.platform === 'stm32' && ctx.hasLibxrConfig ? ctx.libxrConfigAbs : undefined;
+
 		if (ctx.platform === 'mspm0') {
 			// The pin layout works for an MSPM0; LibXR code generation is STM32 only.
 			return [
-				fileNode(`Platform: [MSPM0] ${ctx.pinsSource ?? ''}`, path.join(ctx.root, ctx.pinsSource ?? ''), ctx.pinsSource ?? '', 'none'),
-				pinLayoutNode(pinsService.state),
-				...peripheralNodes(pinsService.state),
+				chipNode(ctx, state),
+				...peripheralsNodes(state, settingsFile),
 				messageNode('Code generation: STM32 only'),
 			];
 		}
 
-		const platformItem: TreeNode =
-			ctx.platform === 'stm32' && ctx.selectedIoc
-				? fileNode(
-						`Platform: [STM32] ${path.basename(ctx.selectedIoc)}`,
-						path.join(ctx.root, ctx.selectedIoc),
-						ctx.selectedIoc,
-						'none',
-				  )
-				: messageNode('Platform: [Unknown] (need *.ioc in workspace root)');
-
 		if (!ctx.hasLibxrConfig) {
 			return [
-				platformItem,
-				pinLayoutNode(pinsService.state),
-				...peripheralNodes(pinsService.state),
+				chipNode(ctx, state),
+				...peripheralsNodes(state, settingsFile),
 				groupNode(
 					'Actions',
 					[
@@ -265,16 +267,13 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			contextValue: 'xrobot.libxr.appMainPath',
 		});
 
-		const systemItem = this.buildSystemItem(ctx);
 		const flashLayoutNodes = this.buildFlashLayoutNodes(ctx);
 		const flashSummary = this.buildFlashLayoutSummary(ctx);
 		const flashLabel = flashSummary ? `Flash Layout: ${flashSummary}` : 'Flash Layout';
 
 		return [
-			platformItem,
-			pinLayoutNode(pinsService.state),
-			systemItem,
-			...peripheralNodes(pinsService.state),
+			chipNode(ctx, state, this.buildSystemItem(ctx)),
+			...peripheralsNodes(state, settingsFile),
 			groupNode(flashLabel, flashLayoutNodes, false),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
@@ -765,8 +764,10 @@ function createTreeItem(node: TreeNode): vscode.TreeItem {
 			node.label,
 			node.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
 		);
+		item.id = `peripheral:${node.peripheral}`;
 		item.description = node.description;
-		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category]);
+		item.tooltip = new vscode.MarkdownString(node.tooltip);
+		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category], new vscode.ThemeColor(CATEGORY_COLORS[node.category]));
 		item.command = { command: 'xrobot.showPinLayout', title: 'Show Pin Layout', arguments: [{ peripheral: node.peripheral }] };
 		return item;
 	}
@@ -776,9 +777,12 @@ function createTreeItem(node: TreeNode): vscode.TreeItem {
 			node.label,
 			node.expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
 		);
+		if (node.id) {
+			item.id = node.id;
+		}
 		item.description = node.description ?? `${node.children.length} items`;
 		item.tooltip = node.tooltip;
-		item.iconPath = new vscode.ThemeIcon(node.iconId ?? groupIconId(node.label));
+		item.iconPath = new vscode.ThemeIcon(node.iconId ?? groupIconId(node.label), node.color ? new vscode.ThemeColor(node.color) : undefined);
 		return item;
 	}
 
@@ -937,9 +941,9 @@ function groupNode(
 	children: TreeNode[],
 	expanded = false,
 	description?: string,
-	options?: { iconId?: string; tooltip?: string },
+	options?: { iconId?: string; tooltip?: string; id?: string; color?: string },
 ): GroupNode {
-	return { type: 'group', label, children, expanded, description, iconId: options?.iconId, tooltip: options?.tooltip };
+	return { type: 'group', id: options?.id, label, children, expanded, description, iconId: options?.iconId, tooltip: options?.tooltip, color: options?.color };
 }
 
 function fileNode(
@@ -969,18 +973,53 @@ function actionNode(label: string, runRequest: CliRunRequest): ActionNode {
 	return { type: 'action', label, runRequest };
 }
 
-// Opens the pin layout panel (`libxr pins`): a view of the chip, not an action on the project.
-function pinLayoutNode(state: PinsState): OpNode {
+// The pin layout panel (`libxr pins`) is a view of the chip, so it sits with the chip, not among
+// the actions.
+function pinLayoutNode(): OpNode {
+	return opNode('Pin Layout', 'xrobot.showPinLayout', [], 'package drawing', 'circuit-board');
+}
+
+// The chip of the project: its part, package and pins, and below it the pin layout, the file the
+// chip was read from and the system. While `libxr pins` runs the last result stays; when it fails the
+// CLI's own message is shown here.
+function chipNode(ctx: WorkspaceContext, state: PinsState, systemItem?: TreeNode): GroupNode {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
 	let description: string | undefined;
-	if (state.status === 'ok') {
-		description = `${state.result.package} · ${state.result.pin_count} pins`;
+	if (result) {
+		description = `${result.package} · ${result.pin_count} pins`;
 	} else if (state.status === 'running') {
-		description = state.previous ? `${state.previous.package} · ${state.previous.pin_count} pins` : 'loading…';
+		description = 'loading…';
 	} else if (state.status === 'error') {
 		description = 'unavailable';
 	}
-	return opNode('Pin Layout', 'xrobot.showPinLayout', [], description, 'circuit-board');
+	const source = ctx.pinsSource ?? '';
+	const children: TreeNode[] = [
+		pinLayoutNode(),
+		fileNode(path.basename(source), path.join(ctx.root, source), source, 'none', {
+			description: ctx.platform === 'mspm0' ? 'SysConfig' : 'STM32CubeMX',
+		}),
+	];
+	if (systemItem) {
+		children.push(systemItem);
+	}
+	if (state.status === 'error') {
+		children.push(messageNode(state.message, undefined, { iconId: 'error', tooltip: state.message }));
+	}
+	const platform = ctx.platform === 'mspm0' ? 'MSPM0' : 'STM32';
+	return groupNode(result ? result.part : `${platform} project`, children, true, description, { iconId: 'chip', id: 'chip' });
 }
+
+const CATEGORY_ORDER: Category[] = ['comm', 'timer', 'analog', 'memory', 'other', 'gpio', 'system'];
+
+const CATEGORY_TITLES: Record<Category, string> = {
+	comm: 'Communication',
+	timer: 'Timers',
+	analog: 'Analog',
+	gpio: 'GPIO',
+	system: 'System',
+	memory: 'Memory',
+	other: 'Other',
+};
 
 const CATEGORY_ICONS: Record<Category, string> = {
 	comm: 'plug',
@@ -992,51 +1031,81 @@ const CATEGORY_ICONS: Record<Category, string> = {
 	other: 'circuit-board',
 };
 
-function peripheralNode(used: UsedPeripheral): PeripheralNode {
-	const children: TreeNode[] = used.pins.map((pin) =>
-		messageNode(`${pin.function}: ${pin.pin}`, undefined, { iconId: 'arrow-right' }),
-	);
-	if (used.config) {
-		children.push(
-			used.config.present
-				? groupNode(
-						`${used.config.section}.${used.config.key}`,
-						Object.entries(used.config.params ?? {}).map(([name, value]) =>
-							messageNode(`${name}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`, undefined, { iconId: 'symbol-field' }),
-						),
-						false,
-						`${Object.keys(used.config.params ?? {}).length} settings`,
-				  )
-				: messageNode(`${used.config.section}.${used.config.key}: not in libxr_config.yaml`, undefined, { iconId: 'warning' }),
-		);
+// The panel's colours for the categories, as theme colours.
+const CATEGORY_COLORS: Record<Category, string> = {
+	comm: 'charts.blue',
+	timer: 'charts.orange',
+	analog: 'charts.green',
+	gpio: 'charts.purple',
+	system: 'charts.yellow',
+	memory: 'charts.red',
+	other: 'disabledForeground',
+};
+
+// What the pins of a peripheral say in one line: the first three, then how many more.
+function pinsSummary(used: UsedPeripheral): string {
+	const shown = used.pins.slice(0, 3).map((pin) => `${pin.function} ${pin.pin}`);
+	const more = used.pins.length - shown.length;
+	return more > 0 ? `${shown.join(' · ')} · +${more}` : shown.join(' · ');
+}
+
+function peripheralTooltip(used: UsedPeripheral): string {
+	const lines = [`**${used.name}** · ${used.kind}`, ''];
+	for (const pin of used.pins) {
+		lines.push(`- ${pin.function}: \`${pin.pin}\``);
 	}
-	const status = used.config ? (used.config.present ? 'configured' : 'not configured') : '';
-	const pins = used.pins.map((pin) => `${pin.function} ${pin.pin}`).join(' · ');
+	if (used.config) {
+		lines.push('', used.config.present ? `Settings: \`${used.config.section}.${used.config.key}\`` : `Not in libxr_config.yaml (\`${used.config.section}.${used.config.key}\`)`);
+	}
+	return lines.join('\n');
+}
+
+// A peripheral the project selected. Its settings in libxr_config.yaml are its children and can be
+// edited like the Config File (settingsFile), which regenerates the code.
+function peripheralNode(used: UsedPeripheral, settingsFile?: string): PeripheralNode {
+	let children: TreeNode[] = [];
+	if (used.config?.present && settingsFile) {
+		children = toYamlValueNodes(used.config.params ?? {}, 0, settingsFile, [used.config.section, used.config.key], true);
+	} else if (used.config && !used.config.present) {
+		children = [messageNode(`Not in libxr_config.yaml yet (${used.config.section}.${used.config.key})`, undefined, { iconId: 'info' })];
+	}
+	const status = used.config && !used.config.present ? 'not configured' : '';
 	return {
 		type: 'peripheral',
 		label: used.name,
-		description: [status, pins].filter(Boolean).join(' · '),
-		category: categoryOf(used.kind),
+		description: [pinsSummary(used), status].filter(Boolean).join(' · '),
+		tooltip: peripheralTooltip(used),
+		category: used.category,
 		peripheral: used.name,
 		children,
 	};
 }
 
-// The peripherals the project selected, from the shared `libxr pins` result; nothing when the
-// workspace has no chip project, and the CLI's own message when it failed.
-function peripheralNodes(state: PinsState): TreeNode[] {
-	if (state.status === 'none') {
+// The peripherals the project selected, by category, from the shared `libxr pins` result. Nothing
+// while there is no result (the chip says why).
+function peripheralsNodes(state: PinsState, settingsFile?: string): TreeNode[] {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
+	if (!result) {
 		return [];
 	}
-	if (state.status === 'error') {
-		return [messageNode(`Peripherals: ${state.message}`, undefined, { iconId: 'error' })];
-	}
-	const result = state.status === 'ok' ? state.result : state.previous;
-	if (!result) {
-		return [messageNode('Peripherals: loading…', undefined, { iconId: 'sync' })];
-	}
 	const used = usedPeripherals(result);
-	return [groupNode('Peripherals', used.map(peripheralNode), true, `${used.length} selected`)];
+	if (used.length === 0) {
+		return [messageNode('Peripherals: the project selects none', undefined, { iconId: 'info' })];
+	}
+	const groups = CATEGORY_ORDER.map((category) => {
+		const members = used.filter((peripheral) => peripheral.category === category);
+		// GPIO and system pins are many and rarely what one looks for: they start closed.
+		return members.length === 0
+			? undefined
+			: groupNode(
+					CATEGORY_TITLES[category],
+					members.map((peripheral) => peripheralNode(peripheral, settingsFile)),
+					category !== 'gpio' && category !== 'system',
+					String(members.length),
+					{ iconId: CATEGORY_ICONS[category], id: `peripherals:${category}`, color: CATEGORY_COLORS[category] },
+			  );
+	}).filter((group): group is GroupNode => group !== undefined);
+	return [groupNode('Peripherals', groups, true, `${used.length}`, { iconId: 'symbol-interface', id: 'peripherals' })];
 }
 
 function opNode(label: string, command: string, args: unknown[] = [], description?: string, iconId?: string): OpNode {

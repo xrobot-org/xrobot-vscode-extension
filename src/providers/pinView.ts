@@ -3,7 +3,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { getWorkspaceRoot } from '../cliHost';
+import { getWorkspaceRoot, outputChannel } from '../cliHost';
 import { pinsService, type PinsState } from '../pinsService';
 import { detectPinsProject, listIocFiles } from '../pins/project';
 import { buildView, type ViewData } from '../pins/view';
@@ -68,6 +68,8 @@ function show(state: PinsState): void {
 	} else if (state.status === 'none') {
 		latest = { error: 'No STM32CubeMX .ioc or SysConfig ti_msp_dl_config.h in the workspace.' };
 	} else {
+		// A run is going: what is shown stays, marked as being updated.
+		post({ type: 'busy' });
 		return;
 	}
 	post({ type: 'data', data: latest });
@@ -131,6 +133,8 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 			}
 		} else if (message.type === 'openConfig') {
 			void openConfigFile();
+		} else if (message.type === 'showOutput') {
+			outputChannel.show(true);
 		} else if (message.type === 'selection') {
 			selectionHandler?.(typeof message.peripheral === 'string' ? message.peripheral : null);
 		}
