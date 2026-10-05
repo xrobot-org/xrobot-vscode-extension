@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { getWorkspaceRoot, outputChannel, startQuiet } from './cliHost';
 import { libxrArgs, type CliRun } from './cli/xrobotCli';
-import { parsePinsOutput, type PinsResult } from './pins/model';
+import { parsePinsOutput, pinsFailureHint, type PinsResult } from './pins/model';
 import { detectPinsProject, listIocFiles } from './pins/project';
 
 export type PinsState =
@@ -53,7 +53,7 @@ class PinsService {
 		}
 		if (!outcome.ok) {
 			outputChannel.appendLine(`[pins] ${run.commandLine}: ${outcome.message ?? ''}`);
-			this.set({ status: 'error', message: outcome.message ?? 'libxr pins failed' });
+			this.set({ status: 'error', message: pinsFailureHint(outcome.message ?? 'libxr pins failed') });
 			return;
 		}
 		const parsed = parsePinsOutput(outcome.stdout);

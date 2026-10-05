@@ -116,6 +116,17 @@ export function parsePinsOutput(text: string): PinsParse {
 	return { ok: true, result: value as unknown as PinsResult };
 }
 
+// What a failed `libxr pins` run says when the installed libxr is too old to have the command
+// (5.x has no `python -m libxr`; 6.0.x has no `pins`): the CLI's own message is an ImportError or
+// an argparse usage line, which does not tell the user what to do.
+export function pinsFailureHint(message: string): string {
+	if (/No module named libxr\.__main__|invalid choice.*'pins'/i.test(message)) {
+		return `${message}
+The libxr that was found is too old for the pin layout: it needs a release that has the "libxr pins" command. Update it (pip install -U libxr) or point xrobot.cli.extraPath / xrobot.cli.pythonPath at one that has it.`;
+	}
+	return message;
+}
+
 // The platform tag shown in the views.
 export function platformLabel(platform: string): string {
 	switch (platform) {

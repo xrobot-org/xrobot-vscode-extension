@@ -5,7 +5,7 @@ import * as path from 'node:path';
 
 import { libxrArgs } from '../../cli/xrobotCli';
 import { packageGeometry, pinCount } from '../../pins/geometry';
-import { categoryOf, parsePinsOutput, type PinsPin, type PinsResult } from '../../pins/model';
+import { categoryOf, parsePinsOutput, pinsFailureHint, type PinsPin, type PinsResult } from '../../pins/model';
 import { detectPinsProject, findTiHeader } from '../../pins/project';
 import { buildView, usedPeripherals } from '../../pins/view';
 
@@ -305,6 +305,14 @@ suite('pin layout view', () => {
 		assert.strictEqual(view.sysconfigFile, null);
 		assert.strictEqual(view.peripherals.USART1.sysconfig, undefined);
 		assert.strictEqual(view.peripherals.USART1.config?.present, true);
+	});
+
+	test('an old libxr is reported with what to do, any other failure unchanged', () => {
+		const old = "ImportError: No module named libxr.__main__; 'libxr' is a package and cannot be directly executed";
+		assert.ok(pinsFailureHint(old).startsWith(old));
+		assert.ok(pinsFailureHint(old).includes('pip install -U libxr'));
+		assert.ok(pinsFailureHint("libxr: error: argument <command>: invalid choice: 'pins'").includes('xrobot.cli.extraPath'));
+		assert.strictEqual(pinsFailureHint('libxr: no such chip'), 'libxr: no such chip');
 	});
 
 	test('a layout without a project has nothing selected', () => {
