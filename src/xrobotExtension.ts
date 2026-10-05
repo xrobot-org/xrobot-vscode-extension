@@ -3,6 +3,7 @@ import { LibxrTreeProvider, XrobotTreeProvider, registerWatchers } from './provi
 import { registerXrobotCommands } from './commands/commandHandlers';
 import { checkDependencies } from './commands/xrobotCommands';
 import { initCliHost, outputChannel } from './cliHost';
+import { refreshPinLayout } from './providers/pinView';
 
 // File events arrive in bursts (a CLI rewrites several files); one refresh per burst
 // avoids starting and cancelling several `xrobot describe` runs.
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const refreshNow = (): void => {
 		libxrProvider.refresh();
 		xrobotProvider.refresh();
+		void refreshPinLayout();
 	};
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const refreshSoon = (): void => {

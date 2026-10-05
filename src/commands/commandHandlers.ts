@@ -10,6 +10,7 @@ import {
 	type OpenFileTarget,
 } from '../providers/viewProviders';
 import type { InstanceEditTarget } from '../providers/instanceEditor';
+import { showPinLayout } from '../providers/pinView';
 import {
 	addModuleInstance,
 	addRepo,
@@ -42,6 +43,7 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));
 	register('xrobot.openUrl', (url?: string) => openUrl(url));
 	register('xrobot.refreshAll', () => refreshAll());
+	register('xrobot.showPinLayout', () => showPinLayout(context));
 	register('xrobot.collapseAllViews', async () => {
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');

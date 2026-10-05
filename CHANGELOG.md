@@ -1,5 +1,22 @@
 # Change Log
 
+## [Unreleased]
+
+### Added
+
+- `XRobot: Show Pin Layout` (also in the LibXR view): a panel with the package and pin
+  layout of the project's chip from `libxr pins -d`, and the pins the project selected
+  coloured by peripheral category. Clicking a pin lists the peripheral functions it can
+  carry; a selected peripheral shows its section in `libxr_config.yaml` and its current
+  parameters. Read-only. Needs a libxr release that has `libxr pins`.
+- MSPM0 projects (a SysConfig `ti_msp_dl_config.h`) are recognized: the LibXR view shows the
+  platform and the pin layout. The setting `xrobot.libxr.package` gives the package.
+
+### Changed
+
+- The LibXR view no longer says "Unsupported platform" for a workspace without an `.ioc`; it
+  says what it recognizes.
+
 ## [2.0.0] - 2026-10-04
 
 Requires xrobot 1.0 and its single `xrobot` command (including

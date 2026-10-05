@@ -26,6 +26,7 @@ import { canSwitchConstructor, type InstanceEditTarget } from './instanceEditor'
 import { libxrArgs, xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
+import { detectPinsProject } from '../pins/project';
 
 export type CliRunRequest = {
 	label: string;
@@ -110,7 +111,9 @@ type WorkspaceContext = {
 	root: string;
 	iocFiles: string[];
 	selectedIoc?: string;
-	platform: 'stm32' | 'unknown';
+	platform: 'stm32' | 'mspm0' | 'unknown';
+	// The .ioc or ti_msp_dl_config.h the platform was recognized from.
+	pinsSource?: string;
 	libxrConfigRel: string;
 	libxrConfigAbs: string;
 	appMainRel: string;
@@ -159,8 +162,20 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	}
 
 	private buildRoot(ctx: WorkspaceContext): TreeNode[] {
-		if (ctx.platform !== 'stm32') {
-			return [messageNode('Unsupported platform (currently only STM32 with *.ioc in workspace root).')];
+		if (ctx.platform === 'unknown') {
+			return [
+				messageNode(
+					'No platform recognized: the workspace root needs an STM32CubeMX .ioc, or a SysConfig ti_msp_dl_config.h for an MSPM0.',
+				),
+			];
+		}
+		if (ctx.platform === 'mspm0') {
+			// The pin layout works for an MSPM0; LibXR code generation is STM32 only.
+			return [
+				fileNode(`Platform: [MSPM0] ${ctx.pinsSource ?? ''}`, path.join(ctx.root, ctx.pinsSource ?? ''), ctx.pinsSource ?? '', 'none'),
+				groupNode('Actions', [pinLayoutNode()], false),
+				messageNode('Code generation: STM32 only'),
+			];
 		}
 
 		const platformItem: TreeNode =
@@ -184,6 +199,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 							tool: 'libxr',
 							args: ['stm32', 'setup', '-d', '.'],
 						}),
+						pinLayoutNode(),
 					],
 					false,
 				),
@@ -284,6 +300,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		if (ctx.platform === 'stm32') {
 			nodes.push(
+				pinLayoutNode(),
 				actionNode('Configure CubeMX (libxr stm32 setup)', {
 					label: 'libxr stm32 setup',
 					tool: 'libxr',
@@ -890,6 +907,11 @@ function actionNode(label: string, runRequest: CliRunRequest): ActionNode {
 	return { type: 'action', label, runRequest };
 }
 
+// Opens the pin layout panel (`libxr pins`).
+function pinLayoutNode(): OpNode {
+	return opNode('Show Pin Layout (libxr pins)', 'xrobot.showPinLayout', [], 'package and selected pins', 'circuit-board');
+}
+
 function opNode(label: string, command: string, args: unknown[] = [], description?: string, iconId?: string): OpNode {
 	return { type: 'op', label, command, args, description, iconId };
 }
@@ -976,12 +998,14 @@ function getWorkspaceContext(): WorkspaceContext | undefined {
 	const iocFiles = detectIocFiles(root);
 	const selectedIoc = resolveIocFile(root, iocFiles);
 	const libxrConfig = resolveLibxrConfig(root);
+	const pinsProject = detectPinsProject(root, selectedIoc ? [selectedIoc] : []);
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp');
 	return {
 		root,
 		iocFiles,
 		selectedIoc,
-		platform: selectedIoc ? 'stm32' : 'unknown',
+		platform: pinsProject?.platform ?? 'unknown',
+		pinsSource: pinsProject?.source,
 		libxrConfigRel: libxrConfig.selectedRel,
 		libxrConfigAbs: path.join(root, libxrConfig.selectedRel),
 		libxrConfigCandidates: libxrConfig.candidates,

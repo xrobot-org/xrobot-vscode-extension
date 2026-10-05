@@ -22,6 +22,7 @@
   ],
   "activationEvents": [
     "onCommand:xrobot.helloWorld",
+    "onCommand:xrobot.showPinLayout",
     "onView:xrobot.libxrView",
     "onView:xrobot.xrobotView"
   ],
@@ -78,6 +79,10 @@
       {
         "command": "xrobot.refreshAll",
         "title": "XRobot: Refresh All"
+      },
+      {
+        "command": "xrobot.showPinLayout",
+        "title": "XRobot: Show Pin Layout"
       },
       {
         "command": "xrobot.collapseAllViews",
@@ -203,6 +208,11 @@
           "type": "string",
           "default": "",
           "description": "Preferred STM32 .ioc file relative to workspace root. Leave empty to auto-detect first root-level *.ioc."
+        },
+        "xrobot.libxr.package": {
+          "type": "string",
+          "default": "",
+          "description": "Package of the chip for the pin layout, for a project whose model does not name it (an MSPM0: LQFP-64, PM, VQFN-48, ...). Leave empty for an STM32."
         },
         "xrobot.libxr.configPath": {
           "type": "string",

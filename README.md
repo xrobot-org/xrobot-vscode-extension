@@ -140,6 +140,23 @@ and the MCU and internal Flash layout recorded in `User/flash_map.hpp`, listed a
 sectors. Values of `libxr_config.yaml` can be edited in the view, followed by `libxr gen`. The
 view's actions are `libxr stm32 setup`, `libxr parse`, `libxr gen` and `libxr stm32 flash-info`.
 
+### 引脚布局 / Pin Layout
+
+"Show Pin Layout" 打开芯片的封装图（`libxr pins`，需要带有该命令的 libxr）：每个引脚的位置、名称和全部可选信号，
+工程在 `.ioc`（STM32）或 SysConfig 生成的 `ti_msp_dl_config.h`（MSPM0）中已选的引脚按外设类别着色。点击引脚
+显示它能承载的外设功能；已选的外设显示它在 `libxr_config.yaml` 中的段和当前参数。图中列出所有识别出的外设，
+包括 LibXR 没有对应抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装用设置 `xrobot.libxr.package` 给出。
+目前只读；MSPM0 只有引脚布局，LibXR 代码生成仅支持 STM32。
+
+"Show Pin Layout" opens the package drawing of the chip (`libxr pins`, which needs a libxr release
+that has the command): the position, name and all selectable signals of every pin, with the pins
+the project selected in its `.ioc` (STM32) or in the `ti_msp_dl_config.h` SysConfig generates
+(MSPM0) coloured by peripheral category. Clicking a pin shows the peripheral functions it can
+carry; a selected peripheral shows its section in `libxr_config.yaml` and its current parameters.
+Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC,
+OctoSPI, ...). Give the package of an MSPM0 with the `xrobot.libxr.package` setting. The panel is
+read-only for now; an MSPM0 has the pin layout only, and LibXR code generation is STM32 only.
+
 ---
 
 ## 🚀 命令一览 / Commands
@@ -153,6 +170,7 @@ bars.
 | --- | --- |
 | XRobot: Refresh All | 重新读取两个视图 / Reload both views |
 | XRobot: Collapse All Views | 折叠两个视图 / Collapse both views |
+| XRobot: Show Pin Layout | 打开封装图 / Open the package drawing |
 | XRobot: Select Product (xrobot gen -c) | 选择配置并生成头文件 / Select a configuration and generate the header |
 | XRobot: Add Module Instance | 添加实例 / Add an instance |
 | XRobot: Edit Module Instance | 修改实例 / Edit an instance |
@@ -177,6 +195,7 @@ bars.
 | `xrobot.cli.extraPath` | 查找命令行工具时追加的目录（PATH 语法）/ Extra directories for finding the CLIs (PATH syntax) |
 | `xrobot.cli.pythonPath` | 找不到命令时用于运行对应 Python 模块的解释器 / Interpreter that runs the Python module when a command is not found |
 | `xrobot.libxr.iocFile` | 使用的 `.ioc` 文件，留空时取根目录下的第一个 / The `.ioc` file to use; empty takes the first one at the root |
+| `xrobot.libxr.package` | 芯片封装，用于型号中没有封装的工程（MSPM0：`LQFP-64`、`PM` 等）/ Package of the chip for a project whose model does not name it (MSPM0: `LQFP-64`, `PM`, ...) |
 | `xrobot.libxr.configPath` | `libxr_config.yaml` 的路径 / Path of `libxr_config.yaml` |
 | `xrobot.libxr.appMainPath` | `app_main.cpp` 的路径 / Path of `app_main.cpp` |
 

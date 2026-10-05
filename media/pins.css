@@ -1,0 +1,80 @@
+/* Colours follow the VS Code theme; the categories use the chart colours so they stay readable
+   in light and dark themes. */
+:root {
+	--comm: var(--vscode-charts-blue, #3794ff);
+	--timer: var(--vscode-charts-orange, #d18616);
+	--analog: var(--vscode-charts-green, #89d185);
+	--gpio: var(--vscode-charts-purple, #b180d7);
+	--system: var(--vscode-charts-yellow, #cca700);
+	--memory: var(--vscode-charts-red, #f14c4c);
+	--other: var(--vscode-descriptionForeground, #9d9d9d);
+}
+body { padding: 0 12px 12px; font-family: var(--vscode-font-family); color: var(--vscode-foreground); font-size: var(--vscode-font-size); }
+header { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
+h1 { font-size: 1.3em; margin: 0; }
+h2 { font-size: 1.05em; margin: 14px 0 6px; }
+h3 { margin: 6px 0; }
+h4 { margin: 10px 0 4px; font-weight: 600; }
+.subtitle { color: var(--vscode-descriptionForeground); }
+.tools { margin-left: auto; display: inline-flex; gap: 4px; }
+button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 0; padding: 2px 8px; cursor: pointer; border-radius: 2px; }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button.link { background: none; color: var(--vscode-textLink-foreground); padding: 4px 0; }
+.main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.package { flex: 1 1 520px; min-width: 320px; overflow: auto; max-height: calc(100vh - 80px); border: 1px solid var(--vscode-panel-border); border-radius: 3px; }
+aside { flex: 0 0 320px; max-width: 100%; }
+.error { color: var(--vscode-errorForeground); white-space: pre-wrap; }
+.dim { color: var(--vscode-descriptionForeground); }
+.source { margin-top: 18px; font-size: 0.85em; }
+
+/* package */
+svg .body { fill: var(--vscode-editorWidget-background); stroke: var(--vscode-panel-border); }
+svg .chip { fill: var(--vscode-descriptionForeground); font-size: 12px; }
+svg .cell rect { stroke: var(--vscode-panel-border); stroke-width: 0.5; cursor: pointer; }
+svg .cell text { fill: var(--vscode-foreground); font-size: 7.5px; pointer-events: none; }
+svg .cell text.ball { font-size: 6.5px; }
+svg .cell.free rect { fill: var(--vscode-input-background); }
+svg .cell.power rect { fill: var(--vscode-badge-background); opacity: 0.7; }
+svg .cell.special rect { fill: var(--vscode-inputValidation-warningBackground, #4d3a00); }
+svg .cell.assigned rect { stroke: var(--vscode-foreground); stroke-width: 0.8; }
+svg .cell.assigned text { font-weight: 600; }
+svg .cell.cat-comm rect { fill: var(--comm); }
+svg .cell.cat-timer rect { fill: var(--timer); }
+svg .cell.cat-analog rect { fill: var(--analog); }
+svg .cell.cat-gpio rect { fill: var(--gpio); }
+svg .cell.cat-system rect { fill: var(--system); }
+svg .cell.cat-memory rect { fill: var(--memory); }
+svg .cell.cat-other rect { fill: var(--other); }
+svg .cell.mismatch rect { stroke: var(--vscode-errorForeground); stroke-width: 1.5; stroke-dasharray: 2 1; }
+svg .cell.highlight rect { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+svg .cell.selected rect { stroke: var(--vscode-focusBorder); stroke-width: 2.5; }
+svg .cell:hover rect { stroke: var(--vscode-focusBorder); }
+
+/* side panel */
+.row { display: flex; gap: 8px; justify-content: space-between; padding: 1px 0; }
+.row .k { color: var(--vscode-descriptionForeground); }
+.row.head { font-weight: 600; justify-content: flex-start; }
+.entry { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 8px; }
+.selected-signal { margin: 6px 0; padding: 4px 6px; border-left: 3px solid var(--vscode-focusBorder); background: var(--vscode-editorWidget-background); }
+.selected-signal.mismatch { border-left-color: var(--vscode-errorForeground); }
+.config { margin: 6px 0; padding: 4px 6px; background: var(--vscode-editorWidget-background); }
+.fn { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0; }
+.fn .peripheral { font-weight: 600; min-width: 5em; }
+.fn .chip { padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
+.fn.cat-comm .chip { border-color: var(--comm); }
+.fn.cat-timer .chip { border-color: var(--timer); }
+.fn.cat-analog .chip { border-color: var(--analog); }
+.fn.cat-gpio .chip { border-color: var(--gpio); }
+.fn.cat-system .chip { border-color: var(--system); }
+.fn.cat-memory .chip { border-color: var(--memory); }
+.used { border-left: 4px solid var(--other); padding: 3px 8px; margin: 4px 0; cursor: pointer; }
+.used:hover { background: var(--vscode-list-hoverBackground); }
+.used.cat-comm { border-left-color: var(--comm); }
+.used.cat-timer { border-left-color: var(--timer); }
+.used.cat-analog { border-left-color: var(--analog); }
+.used.cat-gpio { border-left-color: var(--gpio); }
+.used.cat-system { border-left-color: var(--system); }
+.used.cat-memory { border-left-color: var(--memory); }
+.used .title { display: flex; gap: 8px; align-items: baseline; }
+.badge { font-size: 0.8em; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.badge.dim { background: none; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); }
