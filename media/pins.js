@@ -48,6 +48,9 @@
 	let locatedPosition;
 	let pendingPeripheral;
 	let searchText = new Map();
+	// What the user opened or closed, kept across selections and reloads: the legend and the blocks
+	// of the inspector (a block is open unless it says otherwise).
+	const ui = Object.assign({ legend: false, blocks: {} }, (vscode.getState() || {}).ui);
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -95,6 +98,7 @@
 			return;
 		}
 		vscode.setState({
+			ui,
 			title: data.title,
 			subtitle: data.subtitle,
 			query,
@@ -306,9 +310,30 @@
 		return matchIndex >= 0 ? matchIndex + 1 + ' of ' + n : n + (n === 1 ? ' pin' : ' pins');
 	}
 
+	// The legend is a detail: closed, it is one quiet line with the colours; open, it lists the
+	// categories, which also filter the drawing.
 	function legend() {
-		const bar = el('div', 'legend');
+		const wrap = el('details', 'legend');
+		wrap.open = ui.legend || filters.size > 0;
+		const summary = el('summary');
+		summary.append(el('span', 'path-text', 'Legend'));
 		const present = new Set(data.geometry.cells.map((cell) => cell.legend));
+		const swatches = el('span', 'swatches');
+		for (const [key] of LEGEND) {
+			if (present.has(key)) {
+				swatches.append(el('span', 'swatch cat-' + key));
+			}
+		}
+		summary.append(swatches);
+		const active = el('span', 'filtered', filters.size > 0 ? 'Filter: ' + filters.size : '');
+		summary.append(active);
+		wrap.append(summary);
+		wrap.addEventListener('toggle', () => {
+			ui.legend = wrap.open;
+			persist();
+		});
+		const bar = el('div', 'chips-row');
+		wrap.append(bar);
 		for (const [key, name] of LEGEND) {
 			if (!present.has(key)) {
 				continue;
@@ -324,12 +349,13 @@
 				}
 				chip.classList.toggle('on');
 				chip.setAttribute('aria-pressed', String(filters.has(key)));
+				active.textContent = filters.size > 0 ? 'Filter: ' + filters.size : '';
 				restyle();
 				persist();
 			});
 			bar.append(chip);
 		}
-		return bar;
+		return wrap;
 	}
 
 	// ---- zoom and pan -------------------------------------------------------------------------
@@ -685,10 +711,19 @@
 		return line;
 	}
 
-	// A block of a card: its PathLabel, its heading and, if it has one, a line saying what to do.
-	function block(path, title, hint) {
-		const wrap = el('div', 'block');
-		wrap.append(pathLabel.apply(null, path), el('h4', undefined, title));
+	// A block of a card, collapsible: its PathLabel and heading are the summary, a hint and the body
+	// follow. `key` names it for the remembered open state; `open` is its state until the user
+	// changes it.
+	function block(path, title, hint, key, open) {
+		const wrap = el('details', 'block');
+		wrap.open = key in ui.blocks ? ui.blocks[key] : open !== false;
+		wrap.addEventListener('toggle', () => {
+			ui.blocks[key] = wrap.open;
+			persist();
+		});
+		const summary = el('summary');
+		summary.append(pathLabel.apply(null, path), el('h4', undefined, title));
+		wrap.append(summary);
 		if (hint) {
 			wrap.append(el('p', 'hint-line', hint));
 		}
@@ -697,7 +732,7 @@
 
 	// The settings of a peripheral in libxr_config.yaml.
 	function settings(name, config) {
-		const wrap = block([name, 'Settings'], config.section + '.' + config.key);
+		const wrap = block([name, 'Settings'], config.section + '.' + config.key, undefined, 'settings');
 		if (!config.present) {
 			wrap.append(el('p', 'dim', 'Not in libxr_config.yaml yet.'));
 		} else {
@@ -715,7 +750,7 @@
 
 	// The settings of an MSPM0 peripheral in the SysConfig project, read-only: SysConfig edits them.
 	function sysconfigSettings(name, sysconfig) {
-		const wrap = block([name, 'Settings'], 'SysConfig' + (sysconfig.name ? ' · ' + sysconfig.name : ''));
+		const wrap = block([name, 'Settings'], 'SysConfig' + (sysconfig.name ? ' · ' + sysconfig.name : ''), undefined, 'settings');
 		const entries = Object.entries(sysconfig.params || {});
 		if (entries.length === 0) {
 			wrap.append(el('p', 'dim', 'Nothing set. SysConfig uses its defaults.'));
@@ -773,7 +808,7 @@
 			}
 
 			if (data.hasProject) {
-				const used = block([entry.name, 'Used as'], 'Used by the project as');
+				const used = block([entry.name, 'Used as'], 'Used by the project as', undefined, 'used');
 				if (entry.assigned) {
 					const a = entry.assigned;
 					const line = el('div', 'usedas');
@@ -800,7 +835,7 @@
 				card.append(used);
 			}
 
-			const can = block([entry.name, 'Can be'], 'This pin can be', 'Choose one to see that peripheral.');
+			const can = block([entry.name, 'Can be'], 'This pin can be', 'Choose one to see that peripheral.', 'can', !data.hasProject);
 			const groups = new Map();
 			for (const fn of entry.functions) {
 				groups.set(fn.category, (groups.get(fn.category) || []).concat([fn]));
@@ -853,7 +888,7 @@
 				card.append(el('p', 'facts', 'No settings for it in ' + data.sysconfigFile.split('/').pop() + '.'));
 			}
 		}
-		const pins = block([name, 'Pins'], 'Pins', 'Filled: used by the project. Outline: can be used. Choose one to find it.');
+		const pins = block([name, 'Pins'], 'Pins', 'Filled: used by the project. Outline: can be used. Choose one to find it.', 'pins');
 		for (const fn of peripheral.functions) {
 			const line = el('div', 'function');
 			line.append(el('span', 'fname', fn.function));
