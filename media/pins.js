@@ -706,7 +706,8 @@
 		}
 		detail.entries.forEach((entry, index) => {
 			const section = el('section', 'entry');
-			const facts = ['pin ' + detail.position, entry.type];
+			// TI's pin type is "Default" for an ordinary pin; it says nothing.
+			const facts = ['pin ' + detail.position].concat(entry.type === 'Default' ? [] : [entry.type]);
 			if (entry.iomuxPincm !== undefined) {
 				facts.push('PINCM' + entry.iomuxPincm);
 			}

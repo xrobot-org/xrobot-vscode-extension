@@ -218,7 +218,7 @@
         "xrobot.libxr.package": {
           "type": "string",
           "default": "",
-          "description": "Package of the chip for the pin layout, for a project whose model does not name it (an MSPM0: LQFP-64, PM, VQFN-48, ...). Leave empty for an STM32."
+          "description": "Overrides the package of the chip in the pin layout (for an MSPM0: LQFP-64, PM, VQFN-48, ...). Leave empty: an MSPM0 takes it from its SysConfig project (the .syscfg) and an STM32 from its model."
         },
         "xrobot.libxr.configPath": {
           "type": "string",

@@ -156,7 +156,7 @@ LibXR 视图自上而下是：芯片（型号、封装、引脚数，展开后�
 封装图：滚轮以光标为中心缩放（窗口窄、图在检查器上方时，滚轮滚动页面，Ctrl+滚轮缩放），按住拖动平移，双击回到完整视图（像 CubeMX）。已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
 左上角的圆点是 1 脚。搜索框按引脚名、信号或外设（如 `usart1 tx`）高亮匹配的引脚，图例可以按类别过滤。点击引脚
 显示它能承载的外设功能（按类别折叠），点击其中的外设名选中该外设。图中列出所有识别出的外设，包括 LibXR 没有对应
-抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装用设置 `xrobot.libxr.package` 给出。目前只读；MSPM0 只有引脚布局，
+抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装取自 SysConfig 工程（`.syscfg` 的 `--package`，或其 `--board` 对应的 LaunchPad），不用设置；`xrobot.libxr.package` 只用来覆盖它。目前只读；MSPM0 只有引脚布局，
 LibXR 代码生成仅支持 STM32。
 
 The LibXR view reads, top to bottom: the chip (part, package and pins; open it for Pin Layout, the source file and the
@@ -182,8 +182,8 @@ In the drawing the selected pins are coloured by peripheral category and labelle
 function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the top-left corner marks pin 1. The search
 box highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend filters by
 category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
-it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). Give the
-package of an MSPM0 with the `xrobot.libxr.package` setting. The panel is read-only for now; an MSPM0 has the pin layout
+it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). The
+package of an MSPM0 comes from its SysConfig project (the `--package` of the `.syscfg`, or the LaunchPad its `--board` names), so nothing is set; the `xrobot.libxr.package` setting only overrides it. The panel is read-only for now; an MSPM0 has the pin layout
 only, and LibXR code generation is STM32 only.
 
 ---
@@ -224,7 +224,7 @@ bars.
 | `xrobot.cli.extraPath` | 查找命令行工具时追加的目录（PATH 语法）/ Extra directories for finding the CLIs (PATH syntax) |
 | `xrobot.cli.pythonPath` | 找不到命令时用于运行对应 Python 模块的解释器 / Interpreter that runs the Python module when a command is not found |
 | `xrobot.libxr.iocFile` | 使用的 `.ioc` 文件，留空时取根目录下的第一个 / The `.ioc` file to use; empty takes the first one at the root |
-| `xrobot.libxr.package` | 芯片封装，用于型号中没有封装的工程（MSPM0：`LQFP-64`、`PM` 等）/ Package of the chip for a project whose model does not name it (MSPM0: `LQFP-64`, `PM`, ...) |
+| `xrobot.libxr.package` | 覆盖引脚布局中的芯片封装，留空即可（MSPM0 取自 SysConfig 工程）/ Overrides the package of the chip in the pin layout; leave empty (an MSPM0 takes it from its SysConfig project) |
 | `xrobot.libxr.configPath` | `libxr_config.yaml` 的路径 / Path of `libxr_config.yaml` |
 | `xrobot.libxr.appMainPath` | `app_main.cpp` 的路径 / Path of `app_main.cpp` |
 

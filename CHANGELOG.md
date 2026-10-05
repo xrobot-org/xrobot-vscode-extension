@@ -29,7 +29,8 @@
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.
 - MSPM0 projects (a SysConfig `ti_msp_dl_config.h`) are recognized: the LibXR view shows the
-  platform and the pin layout. The setting `xrobot.libxr.package` gives the package.
+  platform and the pin layout. The package comes from the SysConfig project (the `.syscfg`);
+  the setting `xrobot.libxr.package` only overrides it.
 
 ### Changed
 
