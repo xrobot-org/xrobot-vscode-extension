@@ -149,3 +149,11 @@ const CATEGORY_OF: Record<string, Category> = {
 export function categoryOf(kind: string): Category {
 	return CATEGORY_OF[kind] ?? 'other';
 }
+
+// XRobot Style has four data colours (channels): communication, timer, analog and GPIO. Every other
+// category is drawn as "other", without a colour.
+export type Channel = 'comm' | 'timer' | 'analog' | 'gpio' | 'other';
+
+export function channelOf(category: Category): Channel {
+	return category === 'comm' || category === 'timer' || category === 'analog' || category === 'gpio' ? category : 'other';
+}

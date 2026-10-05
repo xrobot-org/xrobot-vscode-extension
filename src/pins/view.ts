@@ -1,6 +1,6 @@
 // What the pin layout webview shows, computed from the `libxr pins` result. Pure.
 import { packageGeometry, type PackageGeometry, type PinCell } from './geometry';
-import { categoryOf, platformLabel, type Category, type PinsAssignment, type PinsConfig, type PinsResult, type PinsSysconfig } from './model';
+import { categoryOf, channelOf, platformLabel, type Category, type PinsAssignment, type PinsConfig, type PinsResult, type PinsSysconfig } from './model';
 
 // The peripheral functions that a pin can carry, from the CLI's own recognition (no second set of
 // naming rules here): the pin name -> instance, kind and function.
@@ -93,8 +93,9 @@ function cellClass(result: PinsResult, names: string[]): { className: string; le
 	for (const name of names) {
 		const assigned = assignments[name];
 		if (assigned) {
-			const category = categoryOf(assigned.kind);
-			return { className: `assigned cat-${category}${assigned.matched ? '' : ' mismatch'}`, legend: category, assigned };
+			// XRobot Style has four data colours: the other categories share "other".
+			const channel = channelOf(categoryOf(assigned.kind));
+			return { className: `assigned cat-${channel}${assigned.matched ? '' : ' mismatch'}`, legend: channel, assigned };
 		}
 	}
 	const types = names.map((name) => result.pins.find((pin) => pin.name === name)?.type ?? '');

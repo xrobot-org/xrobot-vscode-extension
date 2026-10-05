@@ -767,7 +767,7 @@ function createTreeItem(node: TreeNode): vscode.TreeItem {
 		item.id = `peripheral:${node.peripheral}`;
 		item.description = node.description;
 		item.tooltip = new vscode.MarkdownString(node.tooltip);
-		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category], new vscode.ThemeColor(CATEGORY_COLORS[node.category]));
+		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category], CATEGORY_COLORS[node.category] ? new vscode.ThemeColor(CATEGORY_COLORS[node.category]!) : undefined);
 		item.command = { command: 'xrobot.showPinLayout', title: 'Show Pin Layout', arguments: [{ peripheral: node.peripheral }] };
 		return item;
 	}
@@ -1062,15 +1062,13 @@ const CATEGORY_ICONS: Record<Category, string> = {
 	other: 'circuit-board',
 };
 
-// The panel's colours for the categories, as theme colours.
-const CATEGORY_COLORS: Record<Category, string> = {
+// XRobot Style: four data colours (the panel's channels), only for the four categories that have one;
+// the others keep the default icon colour.
+const CATEGORY_COLORS: Partial<Record<Category, string>> = {
 	comm: 'charts.blue',
-	timer: 'charts.orange',
+	timer: 'charts.yellow',
 	analog: 'charts.green',
 	gpio: 'charts.purple',
-	system: 'charts.yellow',
-	memory: 'charts.red',
-	other: 'disabledForeground',
 };
 
 // What the pins of a peripheral say in one line: the first three, then how many more.

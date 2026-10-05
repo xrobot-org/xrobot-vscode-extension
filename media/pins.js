@@ -1,14 +1,16 @@
 // The pin layout webview: draws the package from the geometry the extension computed, zooms and
-// pans it, searches and filters it, and shows the pin or the peripheral that is selected. Text is
-// set with textContent only; the data comes from the CLI and from project files.
+// pans it, searches and filters it, and shows the pin or the peripheral that is selected. It is
+// styled with XRobot Style (pins.css). Text is set with textContent only; the data comes from the
+// CLI and from project files.
 (function () {
 	'use strict';
 	const vscode = acquireVsCodeApi();
 	const SVG = 'http://www.w3.org/2000/svg';
 	const app = document.getElementById('app');
 
-	// The legend entries that filter; power and special pins are drawn but not filtered.
-	const LEGEND = [
+	// The categories a pin can be, for the lists in the inspector; the style has four data colours,
+	// so only the first four have one (pins.css) and the others are told apart by their name.
+	const CATEGORIES = [
 		['comm', 'Communication'],
 		['timer', 'Timer'],
 		['analog', 'Analog'],
@@ -16,10 +18,17 @@
 		['system', 'System'],
 		['memory', 'Memory'],
 		['other', 'Other'],
+	];
+	const CATEGORY_NAMES = Object.fromEntries(CATEGORIES);
+	// What the legend filters: the four coloured categories, the rest together, and the unused pins.
+	const LEGEND = [
+		['comm', 'Communication'],
+		['timer', 'Timer'],
+		['analog', 'Analog'],
+		['gpio', 'GPIO'],
+		['other', 'Other'],
 		['free', 'Unused'],
 	];
-	const CATEGORIES = LEGEND.slice(0, 7);
-	const CATEGORY_NAMES = Object.fromEntries(LEGEND);
 	const NARROW = window.matchMedia('(max-width: 900px)');
 
 	let data;
@@ -60,6 +69,23 @@
 			node.textContent = text;
 		}
 		return node;
+	}
+
+	// PathLabel: says which layer a block belongs to (LIBXR / PINS / PA9).
+	function pathLabel() {
+		const wrap = el('div', 'path');
+		Array.from(arguments).forEach((part, index) => {
+			if (index > 0) {
+				wrap.append(el('span', 'sep', '/'));
+			}
+			wrap.append(el('span', undefined, String(part)));
+		});
+		return wrap;
+	}
+
+	// Status: a conclusion, always with its word.
+	function status(kind, word) {
+		return el('span', 'status ' + kind, word);
 	}
 
 	// ---- state kept while the panel is hidden or the window reloads ----------------------------
@@ -147,21 +173,26 @@
 
 	// ---- page ---------------------------------------------------------------------------------
 
+	// No animation: the state is written out.
 	function loading(text) {
 		app.replaceChildren();
 		const wrap = el('div', 'loading');
-		wrap.append(el('span', 'spinner'), el('span', undefined, text));
+		wrap.append(pathLabel('XRobot', 'Pin layout'), el('div', undefined, text));
 		app.append(wrap);
 	}
 
+	// The CLI did not run: BLOCKED, not a failure of the project.
 	function failure(message) {
 		app.replaceChildren();
-		const wrap = el('div', 'failure');
-		wrap.append(el('h2', undefined, 'Cannot show the pin layout'), el('pre', undefined, message));
+		const card = el('div', 'card failure');
+		card.append(pathLabel('XRobot', 'Pin layout'));
+		const head = el('div', 'card-head');
+		head.append(status('blocked', 'BLOCKED'), el('h2', undefined, 'The pin layout did not run'));
+		card.append(head, el('pre', undefined, message));
 		const output = el('button', 'link', 'Show the XRobot output');
 		output.addEventListener('click', () => vscode.postMessage({ type: 'showOutput' }));
-		wrap.append(output);
-		app.append(wrap);
+		card.append(output);
+		app.append(card);
 	}
 
 	function render() {
@@ -195,9 +226,10 @@
 
 	function toolbar() {
 		const bar = el('div', 'bar');
+		bar.append(pathLabel('XRobot', 'Pin layout', data.platform));
 		const top = el('header');
 		top.append(el('h1', undefined, data.title), el('span', 'subtitle', data.subtitle));
-		top.append(el('span', 'busy', busy ? 'updating…' : ''));
+		top.append(el('span', 'busy', busy ? 'Updating' : ''));
 		const tools = el('span', 'tools');
 		const zoom = el('span', 'zoom', zoomLabel());
 		zoom.id = 'zoom';
@@ -216,7 +248,7 @@
 		search.placeholder = 'Search a pin, signal or peripheral';
 		search.value = query;
 		search.setAttribute('aria-label', 'Search pins');
-		const count = el('span', 'dim count', matchCount());
+		const count = el('span', 'count', matchCount());
 		search.addEventListener('input', () => {
 			query = search.value;
 			matchIndex = -1;
@@ -269,7 +301,7 @@
 		}
 		const n = matches().length;
 		if (n === 0) {
-			return 'no match';
+			return 'No match';
 		}
 		return matchIndex >= 0 ? matchIndex + 1 + ' of ' + n : n + (n === 1 ? ' pin' : ' pins');
 	}
@@ -551,7 +583,7 @@
 		const shown = shownBox();
 		const canvas = svg('svg', { viewBox: shown.x + ' ' + shown.y + ' ' + shown.w + ' ' + shown.h, width: '100%', height: '100%', tabindex: 0, role: 'application' });
 		canvas.setAttribute('aria-label', 'Package ' + data.subtitle + '. Arrow keys move between pins, Escape clears the selection.');
-		canvas.append(svg('rect', { class: 'body', x: g.body.x, y: g.body.y, width: g.body.width, height: g.body.height, rx: 4 }));
+		canvas.append(svg('rect', { class: 'body', x: g.body.x, y: g.body.y, width: g.body.width, height: g.body.height }));
 		canvas.append(svg('circle', { class: 'pin1', cx: g.marker.x, cy: g.marker.y, r: 3.4 }));
 		canvas.append(svg('text', { class: 'chip', x: g.body.x + g.body.width / 2, y: g.body.y + g.body.height / 2, 'text-anchor': 'middle' }, data.title));
 		for (const cell of g.cells) {
@@ -560,7 +592,7 @@
 			group.dataset.position = cell.position;
 			group.dataset.legend = cell.legend;
 			group.append(svg('title', {}, cellDescription(cell)));
-			group.append(svg('rect', { x: cell.x, y: cell.y, width: cell.width, height: cell.height, rx: 1.5 }));
+			group.append(svg('rect', { x: cell.x, y: cell.y, width: cell.width, height: cell.height }));
 			group.append(labelFor(cell));
 			group.addEventListener('click', () => {
 				// A drag that ends on a pin is not a click on it.
@@ -653,24 +685,24 @@
 		return line;
 	}
 
-	function block(title, hint) {
+	// A block of a card: its PathLabel, its heading and, if it has one, a line saying what to do.
+	function block(path, title, hint) {
 		const wrap = el('div', 'block');
-		const heading = el('h4', undefined, title);
+		wrap.append(pathLabel.apply(null, path), el('h4', undefined, title));
 		if (hint) {
-			heading.append(el('span', 'hint', ' ' + hint));
+			wrap.append(el('p', 'hint-line', hint));
 		}
-		wrap.append(heading);
 		return wrap;
 	}
 
 	// The settings of a peripheral in libxr_config.yaml.
-	function settings(config) {
-		const wrap = block('Settings', config.section + '.' + config.key);
+	function settings(name, config) {
+		const wrap = block([name, 'Settings'], config.section + '.' + config.key);
 		if (!config.present) {
-			wrap.append(el('div', 'dim', 'Not in libxr_config.yaml yet.'));
+			wrap.append(el('p', 'dim', 'Not in libxr_config.yaml yet.'));
 		} else {
-			for (const [name, value] of Object.entries(config.params || {})) {
-				wrap.append(row(name, typeof value === 'object' ? JSON.stringify(value) : String(value)));
+			for (const [key, value] of Object.entries(config.params || {})) {
+				wrap.append(row(key, typeof value === 'object' ? JSON.stringify(value) : String(value)));
 			}
 		}
 		if (data.configFile) {
@@ -682,14 +714,14 @@
 	}
 
 	// The settings of an MSPM0 peripheral in the SysConfig project, read-only: SysConfig edits them.
-	function sysconfigSettings(sysconfig) {
-		const wrap = block('Settings', 'SysConfig' + (sysconfig.name ? ' \u00b7 ' + sysconfig.name : ''));
+	function sysconfigSettings(name, sysconfig) {
+		const wrap = block([name, 'Settings'], 'SysConfig' + (sysconfig.name ? ' · ' + sysconfig.name : ''));
 		const entries = Object.entries(sysconfig.params || {});
 		if (entries.length === 0) {
-			wrap.append(el('div', 'dim', 'Nothing set: SysConfig uses its defaults.'));
+			wrap.append(el('p', 'dim', 'Nothing set. SysConfig uses its defaults.'));
 		}
-		for (const [name, value] of entries) {
-			wrap.append(row(name, typeof value === 'object' ? JSON.stringify(value) : String(value)));
+		for (const [key, value] of entries) {
+			wrap.append(row(key, typeof value === 'object' ? JSON.stringify(value) : String(value)));
 		}
 		if (data.sysconfigFile) {
 			const open = el('button', 'link', 'Open ' + data.sysconfigFile.split('/').pop());
@@ -700,67 +732,75 @@
 		return wrap;
 	}
 
-	// The title of the inspector: what is selected, a short line about it, and the button that
-	// clears the selection.
-	function header(title, aside, withClear) {
-		const head = el('div', 'inspector-head');
-		head.append(el('h2', undefined, title));
+	// The head of a card: its PathLabel, what is selected, an aside, and the button that clears it.
+	function cardHead(path, title, aside, withClear) {
+		const head = el('div');
+		head.append(pathLabel.apply(null, path));
+		const line = el('div', 'card-head');
+		line.append(el('h2', undefined, title));
 		if (aside) {
-			head.append(typeof aside === 'string' ? el('span', 'dim', aside) : aside);
+			line.append(aside);
 		}
 		if (withClear) {
-			const clear = el('button', 'link clear', '×');
+			const clear = el('button', 'link clear', 'Clear');
 			clear.title = 'Clear the selection (Escape)';
-			clear.setAttribute('aria-label', 'Clear the selection');
 			clear.addEventListener('click', clearSelection);
-			head.append(clear);
+			line.append(clear);
 		}
+		head.append(line);
 		return head;
 	}
 
 	function pinView(detail) {
 		const wrap = el('div');
-		if (detail.entries.length > 1) {
-			wrap.append(el('p', 'dim', 'Pin ' + detail.position + ' is shared by ' + detail.entries.length + ' pins.'));
-		}
 		detail.entries.forEach((entry, index) => {
-			const section = el('section', 'entry');
+			const card = el('section', 'card');
 			// TI's pin type is "Default" for an ordinary pin; it says nothing.
-			const facts = ['pin ' + detail.position].concat(entry.type === 'Default' ? [] : [entry.type]);
+			const facts = [].concat(entry.type === 'Default' ? [] : [entry.type]);
 			if (entry.iomuxPincm !== undefined) {
 				facts.push('PINCM' + entry.iomuxPincm);
 			}
-			section.append(header(entry.name, facts.join(' · '), index === 0));
+			const path = ['LibXR', 'Pins', 'Pin ' + detail.position];
+			card.append(cardHead(path, entry.name, undefined, index === 0));
+			if (detail.entries.length > 1) {
+				card.append(el('p', 'facts', 'Pin ' + detail.position + ' is shared by ' + detail.entries.length + ' pins.'));
+			}
+			if (facts.length > 0) {
+				card.append(el('p', 'facts', facts.join(' · ')));
+			}
 			if (entry.gpioModes.length > 0) {
-				section.append(el('div', 'dim', 'GPIO: ' + entry.gpioModes.join(', ')));
+				card.append(el('p', 'facts', 'GPIO: ' + entry.gpioModes.join(', ')));
 			}
 
 			if (data.hasProject) {
-				const used = block('Used by the project as');
+				const used = block([entry.name, 'Used as'], 'Used by the project as');
 				if (entry.assigned) {
 					const a = entry.assigned;
-					const line = el('div', 'usedas' + (a.matched ? '' : ' mismatch'));
+					const line = el('div', 'usedas');
+					if (!a.matched) {
+						line.append(status('fail', 'FAIL'));
+					}
 					const name = el('button', 'peripheral-link', a.peripheral + ' · ' + a.function);
 					name.title = 'Show ' + a.peripheral + ': its settings and every pin it can use';
 					name.addEventListener('click', () => selectPeripheral(a.peripheral));
-					line.append(name, el('span', 'dim', ' (' + a.signal + ')'));
+					line.append(name, el('span', 'dim', '(' + a.signal + ')'));
 					used.append(line);
 					if (a.label) {
-						used.append(el('div', 'dim', 'GPIO label: ' + a.label));
+						used.append(el('p', 'dim', 'GPIO label: ' + a.label));
 					}
 					if (!a.matched) {
-						used.append(el('div', 'dim', 'This is not a signal of this pin.'));
+						used.append(el('p', 'dim', 'This is not a signal of this pin.'));
 					}
 					if (a.candidates) {
-						used.append(el('div', 'dim', 'Could be ' + a.candidates.join(' or ') + '.'));
+						used.append(el('p', 'dim', 'Could be ' + a.candidates.join(' or ') + '.'));
 					}
 				} else {
-					used.append(el('div', 'dim', 'Nothing: the project does not use this pin.'));
+					used.append(el('p', 'dim', 'Nothing: the project does not use this pin.'));
 				}
-				section.append(used);
+				card.append(used);
 			}
 
-			const can = block('This pin can be', 'click one to see that peripheral');
+			const can = block([entry.name, 'Can be'], 'This pin can be', 'Choose one to see that peripheral.');
 			const groups = new Map();
 			for (const fn of entry.functions) {
 				groups.set(fn.category, (groups.get(fn.category) || []).concat([fn]));
@@ -784,36 +824,36 @@
 				can.append(line);
 			}
 			if (entry.functions.length === 0) {
-				can.append(el('div', 'dim', 'No peripheral function.'));
+				can.append(el('p', 'dim', 'No peripheral function.'));
 			}
-			section.append(can);
-			wrap.append(section);
+			card.append(can);
+			wrap.append(card);
 		});
 		return wrap;
 	}
 
 	function peripheralView(name) {
 		const peripheral = data.peripherals[name];
-		const wrap = el('div');
-		const badge = el('span', 'kind cat-' + peripheral.category, peripheral.kind);
-		wrap.append(header(name, badge, true));
+		const card = el('section', 'card');
+		const kind = el('span', 'kind', peripheral.kind);
+		card.append(cardHead(['LibXR', 'Peripherals', name], name, kind, true));
 		if (peripheral.capabilities.length > 0) {
-			wrap.append(el('div', 'dim', 'Can be used for: ' + peripheral.capabilities.join(', ')));
+			card.append(el('p', 'facts', 'Can be used for: ' + peripheral.capabilities.join(', ')));
 		}
 		if (peripheral.config) {
-			wrap.append(settings(peripheral.config));
+			card.append(settings(name, peripheral.config));
 		} else if (peripheral.sysconfig) {
-			wrap.append(sysconfigSettings(peripheral.sysconfig));
+			card.append(sysconfigSettings(name, peripheral.sysconfig));
 		} else if (data.hasProject) {
 			if (!peripheral.used) {
-				wrap.append(el('div', 'dim', 'The project does not use it.'));
+				card.append(el('p', 'facts', 'The project does not use it.'));
 			} else if (data.platform === 'stm32') {
-				wrap.append(el('div', 'dim', 'libxr gen does not generate this peripheral.'));
+				card.append(el('p', 'facts', 'libxr gen does not generate this peripheral.'));
 			} else if (data.sysconfigFile) {
-				wrap.append(el('div', 'dim', 'No settings for it in ' + data.sysconfigFile.split('/').pop() + '.'));
+				card.append(el('p', 'facts', 'No settings for it in ' + data.sysconfigFile.split('/').pop() + '.'));
 			}
 		}
-		const pins = block('Pins', 'filled: used · outline: can be used · click one to find it');
+		const pins = block([name, 'Pins'], 'Pins', 'Filled: used by the project. Outline: can be used. Choose one to find it.');
 		for (const fn of peripheral.functions) {
 			const line = el('div', 'function');
 			line.append(el('span', 'fname', fn.function));
@@ -827,8 +867,8 @@
 			line.append(chips);
 			pins.append(line);
 		}
-		wrap.append(pins);
-		return wrap;
+		card.append(pins);
+		return card;
 	}
 
 	function drawSide() {
@@ -839,10 +879,13 @@
 		} else if (selectedPosition && data.details[selectedPosition]) {
 			side.append(pinView(data.details[selectedPosition]));
 		} else {
-			side.append(el('p', 'dim hint', 'Click a pin on the drawing, or choose a peripheral in the sidebar.'));
-			side.append(el('p', 'dim hint', 'Scroll to zoom, drag to pan, double click to fit.'));
+			const card = el('section', 'card');
+			card.append(pathLabel('LibXR', 'Pins'), el('h3', undefined, 'Nothing selected'));
+			card.append(el('p', 'hint', 'Choose a pin on the drawing, or a peripheral in the sidebar.'));
+			card.append(el('p', 'hint', 'Scroll to zoom, drag to pan, double click to fit.'));
+			side.append(card);
 		}
-		side.append(el('p', 'dim source', data.source));
+		side.append(el('p', 'source', data.source));
 	}
 
 	// ---- messages -----------------------------------------------------------------------------
@@ -902,7 +945,7 @@
 			busy = true;
 			const label = document.querySelector('.busy');
 			if (label) {
-				label.textContent = 'updating…';
+				label.textContent = 'Updating';
 			}
 		} else if (message.type === 'select' && message.peripheral) {
 			if (data && !data.error && data.peripherals[message.peripheral]) {
@@ -912,6 +955,6 @@
 			}
 		}
 	});
-	loading('Running libxr pins…');
+	loading('Running libxr pins');
 	vscode.postMessage({ type: 'ready' });
 })();

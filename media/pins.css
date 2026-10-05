@@ -1,191 +1,214 @@
-/* Colours follow the VS Code theme; the categories use the chart colours so they stay readable
-   in light and dark themes. */
-:root {
-	--comm: var(--vscode-charts-blue, #3794ff);
-	--timer: var(--vscode-charts-orange, #d18616);
-	--analog: var(--vscode-charts-green, #89d185);
-	--gpio: var(--vscode-charts-purple, #b180d7);
-	--system: var(--vscode-charts-yellow, #cca700);
-	--memory: var(--vscode-charts-red, #f14c4c);
-	--other: var(--vscode-descriptionForeground, #9d9d9d);
+/* XRobot Style on a VS Code webview (platforms.md of the design system): the tokens take the
+   editor's variables, so the panel follows the theme; the shapes (right angles, one 8px chamfer on
+   a card), the 4px grid, the two weights and the PathLabel stay as the style has them. Colour is
+   written only as tokens; the four channel colours colour data (the pins), never a control. */
+body {
+	--paper: var(--vscode-editor-background);
+	--paper-raised: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	--paper-sunken: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
+	--line: var(--vscode-panel-border);
+	--line-strong: var(--vscode-input-border, var(--vscode-panel-border));
+	--ink: var(--vscode-foreground);
+	--ink-muted: var(--vscode-descriptionForeground);
+	/* tokens.json: on-ink is the paper colour of the theme, so ink-on-paper inverts cleanly. */
+	--on-ink: var(--paper);
+	--focus: var(--vscode-focusBorder);
+	--link: var(--vscode-textLink-foreground);
+	--ch0: var(--vscode-charts-yellow);
+	--ch1: var(--vscode-charts-blue);
+	--ch2: var(--vscode-charts-purple);
+	--ch3: var(--vscode-charts-green);
+	--pass: var(--vscode-testing-iconPassed);
+	--fail: var(--vscode-testing-iconFailed);
+	--blocked: var(--vscode-editorWarning-foreground);
+	--font-sans: var(--vscode-font-family);
+	--font-mono: var(--vscode-editor-font-family);
+
+	--stroke: 1px;
+	--stroke-strong: 2px;
+	--chamfer: 8px;
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-6: 24px;
+	--space-8: 32px;
+	--size-control: 36px;
+	--size-target: 32px;
+	--duration-fast: 80ms;
+	--duration-base: 160ms;
+
+	margin: 0;
+	padding: 0 var(--space-4) var(--space-4);
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--font-sans);
+	font-size: var(--vscode-font-size);
+	line-height: 1.6;
 }
-body { padding: 0 12px 12px; font-family: var(--vscode-font-family); color: var(--vscode-foreground); font-size: var(--vscode-font-size); }
-header { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
-h1 { font-size: 1.3em; margin: 0; }
-h2 { font-size: 1.05em; margin: 14px 0 6px; }
-h3 { margin: 6px 0; }
-h4 { margin: 10px 0 4px; font-weight: 600; }
-.subtitle { color: var(--vscode-descriptionForeground); }
-.tools { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-input[type=search] { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); padding: 2px 6px; min-width: 15em; border-radius: 2px; }
-input[type=search]:focus { outline: 1px solid var(--vscode-focusBorder); }
-button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 0; padding: 2px 8px; cursor: pointer; border-radius: 2px; }
-button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-button.link { background: none; color: var(--vscode-textLink-foreground); padding: 4px 0; }
-.main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-.package { flex: 1 1 520px; min-width: 320px; height: calc(100vh - 150px); min-height: 360px; overflow: hidden; border: 1px solid var(--vscode-panel-border); border-radius: 3px; cursor: grab; touch-action: none; }
+
+*, *::before, *::after { border-radius: 0; box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0ms !important; } }
+
+/* one focus ring for everything that can be focused: 2px, 2px out, a paper gap inside */
+:focus-visible { outline: var(--stroke-strong) solid var(--focus); outline-offset: 2px; }
+svg:focus-visible { outline-offset: -2px; }
+
+h1, h2, h3, h4 { margin: 0; font-weight: 700; color: var(--ink); }
+h1 { font-size: calc(var(--vscode-font-size) * 1.5); line-height: 1.3; }
+h2 { font-size: calc(var(--vscode-font-size) * 1.4); line-height: 1.3; }
+h3 { font-size: calc(var(--vscode-font-size) * 1.15); line-height: 1.4; }
+h4 { font-size: var(--vscode-font-size); line-height: 1.5; }
+p { margin: var(--space-2) 0; }
+.dim { color: var(--ink-muted); }
+.hint { color: var(--ink-muted); max-width: 40em; }
+
+/* ---- PathLabel: where a block belongs ---- */
+.path {
+	display: flex; flex-wrap: wrap; gap: 0 var(--space-2);
+	font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted);
+}
+.path .sep { color: var(--line-strong); }
+
+/* ---- Status: a conclusion, always with its word ---- */
+.status {
+	display: inline-flex; align-items: center; height: 20px; padding: 0 var(--space-2);
+	font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; white-space: nowrap;
+	border: var(--stroke) solid currentColor; background: none;
+}
+.status.fail { color: var(--fail); }
+.status.blocked { color: var(--blocked); }
+
+/* ---- controls ---- */
+button {
+	display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+	min-height: var(--size-control); min-width: var(--size-control); padding: 0 var(--space-3);
+	font: 700 var(--vscode-font-size)/1.4 var(--font-sans);
+	color: var(--ink); background: transparent; border: var(--stroke) solid var(--ink); cursor: pointer;
+	transition: background-color var(--duration-fast) linear, color var(--duration-fast) linear;
+}
+button:hover { background: var(--ink); color: var(--on-ink); }
+button:active { transform: translateY(1px); }
+/* on: emphasis by inversion */
+button.toggle.on, button.chip.on { background: var(--ink); color: var(--on-ink); }
+/* ghost: a link-looking action */
+button.link, button.peripheral-link {
+	min-height: var(--size-target); min-width: 0; padding: 0 var(--space-1);
+	border-color: transparent; background: none; color: var(--link);
+	text-decoration: underline; text-decoration-thickness: var(--stroke); text-underline-offset: 4px;
+}
+button.link:hover, button.peripheral-link:hover { background: none; color: var(--link); text-decoration-thickness: var(--stroke-strong); }
+input[type=search] {
+	height: var(--size-control); padding: 0 var(--space-3); min-width: 10em; flex: 1 1 14em;
+	font: 400 var(--vscode-font-size)/1.4 var(--font-sans);
+	color: var(--ink); background: var(--paper-sunken); border: var(--stroke) solid var(--line-strong);
+}
+input[type=search]::placeholder { color: var(--ink-muted); }
+
+/* ---- header ---- */
+.bar { padding: var(--space-4) 0 var(--space-2); }
+.bar header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); margin-top: var(--space-1); }
+.bar .subtitle { color: var(--ink-muted); }
+.bar .busy { color: var(--ink-muted); }
+.bar .tools { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-1); }
+.zoom { min-width: 4em; text-align: center; color: var(--ink-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.searchrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.count { min-width: 5em; color: var(--ink-muted); }
+
+/* ---- legend: a tag per category, its colour a swatch of the data colour; on = inverted ---- */
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0 var(--space-2); }
+button.chip {
+	--swatch: var(--line-strong);
+	height: var(--size-target); min-height: var(--size-target); padding: 0 var(--space-3);
+	font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+}
+button.chip::before { content: ""; width: 10px; height: 10px; background: var(--swatch); border: var(--stroke) solid currentColor; }
+button.chip.cat-comm { --swatch: var(--ch1); }
+button.chip.cat-timer { --swatch: var(--ch0); }
+button.chip.cat-analog { --swatch: var(--ch3); }
+button.chip.cat-gpio { --swatch: var(--ch2); }
+button.chip.cat-other { --swatch: var(--ink); }
+button.chip.cat-free { --swatch: var(--paper-raised); }
+
+/* ---- layout ---- */
+.main { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-6); margin-top: var(--space-2); }
+.package {
+	flex: 1 1 520px; min-width: 320px; height: calc(100vh - 220px); min-height: 360px; overflow: hidden;
+	background: var(--paper-sunken); border: var(--stroke) solid var(--line); cursor: grab; touch-action: none;
+}
 .package.dragging { cursor: grabbing; }
 .package svg { display: block; user-select: none; }
-aside { flex: 0 0 320px; max-width: 100%; }
-.error { color: var(--vscode-errorForeground); white-space: pre-wrap; }
-.dim { color: var(--vscode-descriptionForeground); }
-.source { margin-top: 18px; font-size: 0.85em; }
-
-/* package */
-svg .body { fill: var(--vscode-editorWidget-background); stroke: var(--vscode-panel-border); }
-svg .chip { fill: var(--vscode-descriptionForeground); font-size: 12px; }
-svg .cell rect { stroke: var(--vscode-panel-border); stroke-width: 0.5; cursor: pointer; }
-svg .cell text { fill: var(--vscode-foreground); font-size: 7.5px; pointer-events: none; }
-svg .cell text.ball { font-size: 6.5px; }
-svg .cell.free rect { fill: var(--vscode-input-background); }
-svg .cell.power rect { fill: var(--vscode-badge-background); opacity: 0.7; }
-svg .cell.special rect { fill: var(--vscode-inputValidation-warningBackground, #4d3a00); }
-svg .cell.assigned rect { stroke: var(--vscode-foreground); stroke-width: 0.8; }
-svg .cell.assigned text { font-weight: 600; }
-svg .cell.cat-comm rect { fill: var(--comm); }
-svg .cell.cat-timer rect { fill: var(--timer); }
-svg .cell.cat-analog rect { fill: var(--analog); }
-svg .cell.cat-gpio rect { fill: var(--gpio); }
-svg .cell.cat-system rect { fill: var(--system); }
-svg .cell.cat-memory rect { fill: var(--memory); }
-svg .cell.cat-other rect { fill: var(--other); }
-svg .cell.mismatch rect { stroke: var(--vscode-errorForeground); stroke-width: 1.5; stroke-dasharray: 2 1; }
-svg .cell.highlight rect { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-svg .cell.selected rect { stroke: var(--vscode-focusBorder); stroke-width: 2.5; }
-svg .cell:hover rect { stroke: var(--vscode-focusBorder); }
-
-/* side panel */
-.row { display: flex; gap: 8px; justify-content: space-between; padding: 1px 0; }
-.row .k { color: var(--vscode-descriptionForeground); }
-.row.head { font-weight: 600; justify-content: flex-start; }
-.entry { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 8px; }
-.selected-signal { margin: 6px 0; padding: 4px 6px; border-left: 3px solid var(--vscode-focusBorder); background: var(--vscode-editorWidget-background); }
-.selected-signal.mismatch { border-left-color: var(--vscode-errorForeground); }
-.config { margin: 6px 0; padding: 4px 6px; background: var(--vscode-editorWidget-background); }
-.fn { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0; }
-.fn .peripheral { font-weight: 600; min-width: 5em; }
-.fn .chip { padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
-.fn.cat-comm .chip { border-color: var(--comm); }
-.fn.cat-timer .chip { border-color: var(--timer); }
-.fn.cat-analog .chip { border-color: var(--analog); }
-.fn.cat-gpio .chip { border-color: var(--gpio); }
-.fn.cat-system .chip { border-color: var(--system); }
-.fn.cat-memory .chip { border-color: var(--memory); }
-
-/* legend, doubles as the category filter */
-.legend { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 8px; }
-.legend .chip { border-radius: 10px; padding: 1px 10px; background: none; color: var(--vscode-foreground); border: 1px solid var(--other); opacity: 0.75; }
-.legend .chip.on { opacity: 1; background: var(--other); color: #fff; }
-.legend .chip.cat-comm { border-color: var(--comm); } .legend .chip.cat-comm.on { background: var(--comm); }
-.legend .chip.cat-timer { border-color: var(--timer); } .legend .chip.cat-timer.on { background: var(--timer); }
-.legend .chip.cat-analog { border-color: var(--analog); } .legend .chip.cat-analog.on { background: var(--analog); }
-.legend .chip.cat-gpio { border-color: var(--gpio); } .legend .chip.cat-gpio.on { background: var(--gpio); }
-.legend .chip.cat-system { border-color: var(--system); } .legend .chip.cat-system.on { background: var(--system); }
-.legend .chip.cat-memory { border-color: var(--memory); } .legend .chip.cat-memory.on { background: var(--memory); }
-
-/* the drawing: pin 1 mark, search, filters and a selected peripheral's candidate pins */
-svg .pin1 { fill: var(--vscode-foreground); opacity: 0.8; }
-svg .cell.dimmed { opacity: 0.2; }
-svg .cell.match rect { stroke: var(--vscode-focusBorder); stroke-width: 1.6; }
-svg .cell.candidate rect { stroke: var(--vscode-focusBorder); stroke-width: 1.6; stroke-dasharray: 2 1; }
-svg .cell.current rect { stroke: var(--vscode-focusBorder); stroke-width: 2.4; }
-
-/* inspector */
-button.link.peripheral { font-weight: 600; padding: 0 4px 0 0; min-width: 5em; text-align: left; }
-.canbe details { margin: 2px 0; }
-.canbe summary { cursor: pointer; padding: 1px 0; font-weight: 600; }
-.canbe summary.cat-comm { color: var(--comm); } .canbe summary.cat-timer { color: var(--timer); }
-.canbe summary.cat-analog { color: var(--analog); } .canbe summary.cat-gpio { color: var(--gpio); }
-.canbe summary.cat-system { color: var(--system); } .canbe summary.cat-memory { color: var(--memory); }
-.fn .chip-fn { padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
-.fn.cat-comm .chip-fn { border-color: var(--comm); } .fn.cat-timer .chip-fn { border-color: var(--timer); }
-.fn.cat-analog .chip-fn { border-color: var(--analog); } .fn.cat-gpio .chip-fn { border-color: var(--gpio); }
-.fn.cat-system .chip-fn { border-color: var(--system); } .fn.cat-memory .chip-fn { border-color: var(--memory); }
-.peripheral-inspector h3 { display: flex; gap: 8px; align-items: baseline; }
-.peripheral-inspector h3 button.link { margin-left: auto; }
-.kind { font-size: 0.8em; padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
-.kind.cat-comm { border-color: var(--comm); } .kind.cat-timer { border-color: var(--timer); }
-.kind.cat-analog { border-color: var(--analog); } .kind.cat-gpio { border-color: var(--gpio); }
-.kind.cat-system { border-color: var(--system); } .kind.cat-memory { border-color: var(--memory); }
-.functions { margin-top: 6px; }
-.function { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
-.function .fname { flex: 0 0 5.5em; font-weight: 600; }
-.function .fpins { display: flex; gap: 4px; flex-wrap: wrap; }
-.pinchip { padding: 0 6px; border-radius: 8px; border: 1px solid var(--vscode-panel-border); background: none; color: var(--vscode-foreground); }
-.pinchip:hover { border-color: var(--vscode-focusBorder); }
-.pinchip.current { background: var(--vscode-focusBorder); color: #fff; border-color: var(--vscode-focusBorder); }
-
-/* a narrow window puts the inspector below the drawing */
+aside { flex: 0 0 340px; max-width: 100%; display: flex; flex-direction: column; gap: var(--space-4); }
+.source { margin: var(--space-2) 0 0; font: 400 12px/16px var(--font-mono); color: var(--ink-muted); }
 @media (max-width: 900px) {
 	.main { flex-direction: column; }
 	aside { flex: none; width: 100%; }
-	.package { flex: none; width: 100%; height: 70vh; }
+	.package { flex: none; width: 100%; height: 55vh; min-height: 300px; }
 }
 
-/* inspector: one selection at a time */
-.inspector-head { display: flex; gap: 8px; align-items: baseline; margin: 4px 0 6px; }
-.inspector-head h2 { margin: 0; }
-.inspector-head button.link { margin-left: auto; font-size: 1.3em; line-height: 1; padding: 0 4px; }
-.block { margin: 12px 0 4px; }
-.block h4 { margin: 0 0 4px; font-weight: 600; }
-.block .hint { font-weight: 400; color: var(--vscode-descriptionForeground); font-size: 0.9em; }
-.usedas { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
-.usedas.mismatch { border-left: 3px solid var(--vscode-errorForeground); padding-left: 6px; }
-button.peripheral-link { background: none; color: var(--vscode-textLink-foreground); font-weight: 600; padding: 0; }
-button.peripheral-link:hover { text-decoration: underline; }
-.can { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
-.can .cat { flex: 0 0 6.5em; font-weight: 600; color: var(--other); }
-.can.cat-comm .cat { color: var(--comm); } .can.cat-timer .cat { color: var(--timer); }
-.can.cat-analog .cat { color: var(--analog); } .can.cat-gpio .cat { color: var(--gpio); }
-.can.cat-system .cat { color: var(--system); } .can.cat-memory .cat { color: var(--memory); }
-.can .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.can .chip-fn { background: none; color: var(--vscode-foreground); cursor: pointer; padding: 0 6px; border-radius: 8px; border: 1px solid var(--other); }
-.can .chip-fn:hover { border-color: var(--vscode-focusBorder); }
-svg .cell.located rect { stroke: var(--vscode-errorForeground, #f14c4c); stroke-width: 3; }
-
-/* ---- polish ---- */
-.bar header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 8px 0 4px; }
-.bar .tools { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
-.zoom { min-width: 3.6em; text-align: center; color: var(--vscode-descriptionForeground); font-variant-numeric: tabular-nums; }
-.busy { color: var(--vscode-descriptionForeground); font-style: italic; }
-.searchrow { display: flex; gap: 8px; align-items: center; padding: 2px 0 8px; flex-wrap: wrap; }
-.searchrow input[type=search] { flex: 1 1 14em; min-width: 10em; }
-.count { min-width: 4.5em; }
-button.toggle { background: none; color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border); }
-button.toggle.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
-
-/* the legend filters: a tint of the category colour when on, so the text stays readable in any theme */
-.legend .chip { --cat: var(--other); background: none; color: var(--vscode-foreground); border: 1px solid var(--cat); opacity: 0.85; }
-.legend .chip.on { background: color-mix(in srgb, var(--cat) 32%, transparent); color: var(--vscode-foreground); opacity: 1; font-weight: 600; }
-.legend .chip.cat-comm { --cat: var(--comm); } .legend .chip.cat-timer { --cat: var(--timer); }
-.legend .chip.cat-analog { --cat: var(--analog); } .legend .chip.cat-gpio { --cat: var(--gpio); }
-.legend .chip.cat-system { --cat: var(--system); } .legend .chip.cat-memory { --cat: var(--memory); }
-.legend .chip.cat-other { --cat: var(--other); } .legend .chip.cat-free { --cat: var(--vscode-panel-border); }
-
-/* labels: readable at the size the package is shown */
-svg .cell text { font-size: 10px; }
+/* ---- the drawing: flat, 1px lines, ink for emphasis, the four channel colours for the data ---- */
+svg .body { fill: var(--paper-raised); stroke: var(--line-strong); stroke-width: 1; }
+svg .pin1 { fill: var(--ink); }
+svg text { fill: var(--ink); font-family: var(--font-mono); }
+svg .chip { fill: var(--ink-muted); font: 700 13px var(--font-sans); letter-spacing: 0; }
+svg .cell rect { fill: var(--paper-raised); stroke: var(--line-strong); stroke-width: 1; cursor: pointer; transition: opacity var(--duration-base) linear; }
+svg .cell { transition: opacity var(--duration-base) linear; }
+svg .cell text { font-size: 10px; pointer-events: none; }
 svg .cell text.ball { font-size: 8px; }
-svg .chip { font-size: 13px; }
-svg:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
-svg .cell:focus-visible rect { stroke: var(--vscode-focusBorder); stroke-width: 2.5; }
+svg .cell.power rect { fill: var(--paper-sunken); stroke: var(--line); }
+svg .cell.special rect { stroke: var(--ink); stroke-dasharray: 2 2; }
+svg .cell.assigned rect { stroke: var(--ink); stroke-width: 1; }
+svg .cell.assigned text { font-weight: 700; }
+svg .cell.cat-comm rect { fill: var(--ch1); }
+svg .cell.cat-timer rect { fill: var(--ch0); }
+svg .cell.cat-analog rect { fill: var(--ch3); }
+svg .cell.cat-gpio rect { fill: var(--ch2); }
+svg .cell.cat-other rect { fill: var(--paper-raised); stroke-width: 2; }
+svg .cell.mismatch rect { stroke-dasharray: 2 1; stroke-width: 2; }
+svg .cell.dimmed { opacity: 0.2; }
+svg .cell:hover rect { stroke: var(--ink); stroke-width: 2; }
+svg .cell.match rect { stroke: var(--ink); stroke-width: 2; }
+svg .cell.candidate rect { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 3 2; }
+svg .cell.current rect { fill: var(--ink); stroke: var(--ink); stroke-width: 2; }
+svg .cell.selected rect { fill: var(--ink); stroke: var(--ink); stroke-width: 2; }
+svg .cell.located rect { stroke: var(--ink); stroke-width: 3; }
+svg .cell:focus-visible rect { stroke: var(--focus); stroke-width: 2; }
 
-/* theme-aware colours for the pin the project uses */
-.pinchip.current { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
-
-/* inspector */
-.inspector-head { margin: 6px 0 4px; }
-.inspector-head h2 { font-size: 1.25em; }
-.hint { margin: 4px 0; }
-
-/* loading and failure */
-.loading { display: flex; align-items: center; gap: 8px; padding: 24px 0; color: var(--vscode-descriptionForeground); }
-.spinner { width: 14px; height: 14px; border: 2px solid var(--vscode-panel-border); border-top-color: var(--vscode-focusBorder); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
-.failure { margin: 16px 0; padding: 8px 12px; border-left: 3px solid var(--vscode-errorForeground); background: var(--vscode-editorWidget-background); }
-.failure h2 { margin: 0 0 6px; }
-.failure pre { white-space: pre-wrap; margin: 0 0 8px; font-family: var(--vscode-editor-font-family, monospace); }
-
-@media (max-width: 900px) {
-	.package { height: 55vh; min-height: 300px; }
+/* ---- the inspector: a card with the one 8px chamfer ---- */
+.card { position: relative; padding: var(--space-4); background: var(--paper-raised); border: var(--stroke) solid var(--line); }
+.card::after {
+	content: ""; position: absolute; top: calc(-1 * var(--stroke)); right: calc(-1 * var(--stroke));
+	width: var(--chamfer); height: var(--chamfer);
+	background: linear-gradient(45deg, transparent calc(50% - 0.75px), var(--line) calc(50% - 0.75px), var(--line) calc(50% + 0.75px), var(--paper) calc(50% + 0.75px));
 }
+.card-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+.card-head .clear { margin-left: auto; }
+.facts { margin-top: var(--space-1); color: var(--ink-muted); }
+.block { margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--stroke) solid var(--line); }
+.block h4 { margin: var(--space-1) 0 var(--space-2); }
+.block .hint-line { margin: 0 0 var(--space-2); color: var(--ink-muted); }
+.row { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-1) 0; border-bottom: var(--stroke) dashed var(--line); font-family: var(--font-mono); }
+.row .k { color: var(--ink-muted); }
+.row .v { text-align: right; overflow-wrap: anywhere; }
+.usedas { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.usedas .status { margin-right: var(--space-2); }
+.kind { display: inline-flex; align-items: center; height: 20px; padding: 0 var(--space-2); font: 700 12px/16px var(--font-mono); letter-spacing: 0.02em; border: var(--stroke) solid var(--ink); }
+
+/* the functions a pin can be, by category; a function is a tag you can click */
+.can { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) 0; }
+.can .cat { display: flex; align-items: center; gap: var(--space-2); font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+.can .cat::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--swatch, var(--paper-raised)); border: var(--stroke) solid var(--ink-muted); }
+.can.cat-comm { --swatch: var(--ch1); } .can.cat-timer { --swatch: var(--ch0); }
+.can.cat-analog { --swatch: var(--ch3); } .can.cat-gpio { --swatch: var(--ch2); }
+.can .chips, .function .fpins { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.can .chip-fn, .pinchip { min-height: var(--size-target); padding: 0 var(--space-2); font-family: var(--font-mono); font-weight: 400; }
+.function { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: var(--space-2); align-items: start; padding: var(--space-1) 0; }
+.function .fname { display: flex; align-items: center; min-height: var(--size-target); font: 700 12px/16px var(--font-mono); letter-spacing: 0.08em; color: var(--ink-muted); }
+/* the pin the project uses: inverted */
+.pinchip.current { background: var(--ink); color: var(--on-ink); font-weight: 700; }
+
+/* ---- loading and failure ---- */
+.loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-8) 0; color: var(--ink-muted); }
+.failure { margin: var(--space-6) 0; max-width: 60em; }
+.failure h2 { margin: var(--space-2) 0; }
+.failure pre { margin: 0 0 var(--space-3); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 var(--vscode-font-size)/1.5 var(--font-mono); }
