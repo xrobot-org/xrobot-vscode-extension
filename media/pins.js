@@ -29,7 +29,7 @@
 		['other', 'Other'],
 		['free', 'Unused'],
 	];
-	const NARROW = window.matchMedia('(max-width: 900px)');
+	const NARROW = window.matchMedia('(max-width: 640px)');
 
 	let data;
 	let previous;
