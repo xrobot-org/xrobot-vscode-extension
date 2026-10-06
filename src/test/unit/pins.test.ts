@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { libxrArgs } from '../../cli/xrobotCli';
 import { packageGeometry, pinCount } from '../../pins/geometry';
 import { categoryOf, parsePinsOutput, pinsFailureHint, type PinsPin, type PinsResult } from '../../pins/model';
-import { detectPinsProject, findTiHeader } from '../../pins/project';
+import { detectPinsProject } from '../../pins/project';
 import { buildView, usedPeripherals } from '../../pins/view';
 
 // Real `libxr pins -d` output (CodeGenerator, `libxr pins` of dev), trimmed to nothing: an
@@ -337,22 +337,32 @@ suite('pin layout project detection', () => {
 		return root;
 	}
 
-	test('an .ioc makes an STM32 project, ahead of a SysConfig header', () => {
-		const root = project(['a.ioc', 'sysconfig/ti_msp_dl_config.h']);
+	test('an .ioc makes an STM32 project, ahead of the others', () => {
+		const root = project(['a.ioc', 'app.yaml', 'boards/board/tool_config.hpmpc', 'a.syscfg']);
 		assert.deepStrictEqual(detectPinsProject(root, ['a.ioc']), { platform: 'stm32', source: 'a.ioc' });
 	});
 
-	test('the SysConfig header makes an MSPM0 project', () => {
-		for (const header of ['ti_msp_dl_config.h', 'sysconfig/ti_msp_dl_config.h', 'a/b/ti_msp_dl_config.h', 'a/b/c/ti_msp_dl_config.h']) {
-			const root = project([header]);
-			assert.deepStrictEqual(detectPinsProject(root, []), { platform: 'mspm0', source: header }, header);
-		}
+	test('a root .syscfg makes an MSPM0 project', () => {
+		const root = project(['board.syscfg']);
+		assert.deepStrictEqual(detectPinsProject(root, []), { platform: 'mspm0', source: 'board.syscfg' });
+		// 子目录里的不算：CLI 只认根目录的 .syscfg。
+		// One in a folder does not count: the CLI takes a root .syscfg only.
+		assert.strictEqual(detectPinsProject(project(['a/b/c.syscfg']), []), undefined);
 	});
 
-	test('a header too deep or inside a build folder does not count', () => {
-		assert.strictEqual(findTiHeader(project(['a/b/c/d/ti_msp_dl_config.h'])), undefined);
-		assert.strictEqual(findTiHeader(project(['build/x/ti_msp_dl_config.h'])), undefined);
-		assert.strictEqual(findTiHeader(project(['cmake-build/x/y/ti_msp_dl_config.h'])), undefined);
+	test('an app.yaml with a .hpmpc under boards/ makes an HPM project', () => {
+		const root = project(['app.yaml', 'boards/board/tool_config.hpmpc']);
+		assert.deepStrictEqual(detectPinsProject(root, []), {
+			platform: 'hpm',
+			source: 'boards/board/tool_config.hpmpc',
+		});
+		// 缺 app.yaml 或 .hpmpc 都不算 HPM 工程。
+		// Neither the app.yaml nor the .hpmpc alone makes an HPM project.
+		assert.strictEqual(detectPinsProject(project(['boards/board/tool_config.hpmpc']), []), undefined);
+		assert.strictEqual(detectPinsProject(project(['app.yaml']), []), undefined);
+	});
+
+	test('no chip project file means no pin layout', () => {
 		assert.strictEqual(detectPinsProject(project(['readme.md']), []), undefined);
 	});
 });

@@ -131,8 +131,8 @@ type WorkspaceContext = {
 	root: string;
 	iocFiles: string[];
 	selectedIoc?: string;
-	platform: 'stm32' | 'mspm0' | 'unknown';
-	// The .ioc or ti_msp_dl_config.h the platform was recognized from.
+	platform: 'stm32' | 'mspm0' | 'hpm' | 'unknown';
+	// The .ioc, .hpmpc or .syscfg the platform was recognized from.
 	pinsSource?: string;
 	libxrConfigRel: string;
 	libxrConfigAbs: string;

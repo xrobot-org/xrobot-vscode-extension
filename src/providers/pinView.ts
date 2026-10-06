@@ -103,7 +103,7 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 	}
 	if (!detectPinsProject(root, listIocFiles(root))) {
 		void vscode.window.showInformationMessage(
-			'No STM32CubeMX .ioc or SysConfig ti_msp_dl_config.h found in the workspace (the pin layout needs one of them).',
+			'No STM32CubeMX .ioc, HPM boards .hpmpc or root SysConfig .syscfg found in the workspace (the pin layout needs one of them).',
 		);
 		return;
 	}

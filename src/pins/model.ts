@@ -134,6 +134,8 @@ export function platformLabel(platform: string): string {
 			return 'STM32';
 		case 'mspm0':
 			return 'MSPM0';
+		case 'hpm':
+			return 'HPM';
 		default:
 			return platform;
 	}

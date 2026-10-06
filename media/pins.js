@@ -273,6 +273,15 @@
 				persist();
 			}));
 		}
+		if (data.platform === 'hpm' && data.sysconfigFile) {
+			// .hpmpc 在 HPM Pinmux Tool 扩展里是它的工程编辑器，打开即用工具编辑。
+			// The .hpmpc is the project editor of the HPM Pinmux Tool extension; opening it edits
+			// the project in that tool.
+			const tool = el('button', 'link', 'HPM Pinmux Tool');
+			tool.title = 'Open the .hpmpc in the HPM Pinmux Tool';
+			tool.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
+			bar.append(tool);
+		}
 		const legendOpen = ui.legend || filters.size > 0;
 		bar.append(toggleButton('Legend' + (filters.size > 0 ? ' · ' + filters.size : ''), 'The categories of the pins; choose one to show only those', legendOpen, () => {
 			ui.legend = !legendOpen;

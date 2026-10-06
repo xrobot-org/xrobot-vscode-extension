@@ -1,69 +1,72 @@
 // Which kind of chip project a workspace holds, for the pin layout. Pure (file system only).
 //
-// The rule is `libxr pins -d`'s own: an STM32CubeMX .ioc in the root is an STM32 project;
-// otherwise the ti_msp_dl_config.h of SysConfig makes an MSPM0 project.
+// The rule is `libxr pins -d`'s own: an STM32CubeMX .ioc in the root is an STM32 project; an
+// app.yaml with a .hpmpc under boards/ makes an HPM project; otherwise a SysConfig .syscfg in
+// the root makes an MSPM0 project.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-export type PinsProjectKind = { platform: 'stm32' | 'mspm0'; source: string };
+export type PinsProjectKind = { platform: 'stm32' | 'mspm0' | 'hpm'; source: string };
 
-const SKIPPED_FOLDERS = new Set(['build', 'cmake-build']);
-
-function directories(folder: string): string[] {
+// The .hpmpc of an HPM project: the first .hpmpc under boards/<board>/, and app.yaml beside the
+// boards folder marks the project. Relative to root, with `/`.
+export function findHpmpc(root: string): string | undefined {
+	if (!fs.existsSync(path.join(root, 'app.yaml'))) {
+		return undefined;
+	}
+	const boards = path.join(root, 'boards');
+	let boardFolders: string[] = [];
 	try {
-		return fs
-			.readdirSync(folder, { withFileTypes: true })
+		boardFolders = fs
+			.readdirSync(boards, { withFileTypes: true })
 			.filter((entry) => entry.isDirectory())
 			.map((entry) => entry.name)
 			.sort();
 	} catch {
-		return [];
+		return undefined;
 	}
-}
-
-// The ti_msp_dl_config.h SysConfig generated: the root and sysconfig/ first, then up to three
-// levels down, never inside a build folder. Relative to root, with `/`.
-export function findTiHeader(root: string): string | undefined {
-	for (const candidate of ['ti_msp_dl_config.h', 'sysconfig/ti_msp_dl_config.h']) {
-		if (fs.existsSync(path.join(root, candidate))) {
-			return candidate;
-		}
-	}
-	const top = directories(root).filter((name) => !SKIPPED_FOLDERS.has(name));
-	for (const depth of [2, 3]) {
-		const found = descend(root, top, depth);
-		if (found) {
-			return found;
+	for (const board of boardFolders) {
+		try {
+			const found = fs
+				.readdirSync(path.join(boards, board), { withFileTypes: true })
+				.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.hpmpc'))
+				.map((entry) => entry.name)
+				.sort();
+			if (found.length > 0) {
+				return `boards/${board}/${found[0]}`;
+			}
+		} catch {
+			continue;
 		}
 	}
 	return undefined;
 }
 
-// Headers `depth` folders below root (the CLI looks at */*/ and */*/*/).
-function descend(root: string, top: string[], depth: number): string | undefined {
-	let level = top.map((name) => name);
-	for (let i = 1; i < depth; i += 1) {
-		level = level.flatMap((relative) =>
-			directories(path.join(root, relative))
-				.filter((name) => !SKIPPED_FOLDERS.has(name))
-				.map((name) => `${relative}/${name}`),
-		);
+// The SysConfig project of an MSPM0: the first .syscfg in the root of the workspace (the CLI
+// errors when there are several). Relative to root, with `/`.
+export function findRootSyscfg(root: string): string | undefined {
+	try {
+		const found = fs
+			.readdirSync(root, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.syscfg'))
+			.map((entry) => entry.name)
+			.sort();
+		return found[0];
+	} catch {
+		return undefined;
 	}
-	for (const relative of level) {
-		const candidate = `${relative}/ti_msp_dl_config.h`;
-		if (fs.existsSync(path.join(root, candidate))) {
-			return candidate;
-		}
-	}
-	return undefined;
 }
 
 export function detectPinsProject(root: string, iocFiles: string[]): PinsProjectKind | undefined {
 	if (iocFiles.length > 0) {
 		return { platform: 'stm32', source: iocFiles[0] };
 	}
-	const header = findTiHeader(root);
-	return header ? { platform: 'mspm0', source: header } : undefined;
+	const hpmpc = findHpmpc(root);
+	if (hpmpc) {
+		return { platform: 'hpm', source: hpmpc };
+	}
+	const syscfg = findRootSyscfg(root);
+	return syscfg ? { platform: 'mspm0', source: syscfg } : undefined;
 }
 
 // The .ioc files in the root of a workspace, sorted (the CLI takes the first).
