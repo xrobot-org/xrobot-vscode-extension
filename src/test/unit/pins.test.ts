@@ -207,17 +207,35 @@ suite('pin layout view', () => {
 	test('the peripherals LibXR generates come first, with their settings', () => {
 		const used = usedPeripherals(fixture('pins-stm32f103c8.json'));
 		assert.strictEqual(used[0].name, 'USART1');
-		assert.deepStrictEqual(used[0].config?.params, {
+		assert.deepStrictEqual(used[0].config?.[0].params, {
 			tx_buffer_size: 128,
 			rx_buffer_size: 128,
 			tx_queue_size: 5,
 			dma_section: '',
 		});
 		const names = used.map((peripheral) => peripheral.name);
-		assert.strictEqual(used.find((peripheral) => peripheral.name === 'SPI1')?.config?.present, false);
+		assert.strictEqual(used.find((peripheral) => peripheral.name === 'SPI1')?.config?.[0].present, false);
 		assert.strictEqual(used.find((peripheral) => peripheral.name === 'GPIOC')?.config, undefined);
 		// configured, then generated but not configured, then the rest.
 		assert.ok(names.indexOf('USART1') < names.indexOf('SPI1') && names.indexOf('SPI1') < names.indexOf('GPIOC'));
+	});
+
+	test('a peripheral keeps every config entry and ranks as configured when one is present', () => {
+		const result = fixture('pins-stm32f103c8.json');
+		result.project!.peripherals.TIM2 = {
+			kind: 'TIM',
+			pins: { CH1: 'PA0' },
+			config: [
+				{ section: 'PWM', key: 'pwm_tim2_c0', present: false },
+				{ section: 'PWM', key: 'pwm_tim2_c1', present: true, params: { frequency: 1000 } },
+			],
+		};
+		const used = usedPeripherals(result);
+		assert.deepStrictEqual(used.find((peripheral) => peripheral.name === 'TIM2')?.config, [
+			{ section: 'PWM', key: 'pwm_tim2_c0', present: false },
+			{ section: 'PWM', key: 'pwm_tim2_c1', present: true, params: { frequency: 1000 } },
+		]);
+		assert.deepStrictEqual(used.slice(0, 2).map((peripheral) => peripheral.name).sort(), ['TIM2', 'USART1']);
 	});
 
 	test('a selected pin shows what it does, a free one nothing', () => {
@@ -242,7 +260,7 @@ suite('pin layout view', () => {
 		const tx = usart1.functions.find((fn) => fn.function === 'TX');
 		assert.deepStrictEqual(tx?.pins.slice().sort(), ['PA9', 'PB6']);
 		assert.strictEqual(tx?.current, 'PA9');
-		assert.strictEqual(usart1.config?.key, 'usart1');
+		assert.strictEqual(usart1.config?.[0].key, 'usart1');
 		assert.strictEqual(view.peripherals.TIM3.used, false);
 		assert.ok(view.peripherals.TIM3.capabilities.includes('pwm'));
 	});
@@ -279,7 +297,11 @@ suite('pin layout view', () => {
 		assert.strictEqual(entry.iomuxPincm, 1);
 		assert.strictEqual(entry.modes?.['UART0.TX'], 2);
 		assert.strictEqual(entry.assigned?.signal, 'UART0.TX');
-		assert.strictEqual(usedPeripherals(fixture('pins-mspm0g3507.json')).find((used) => used.name === 'UART0')?.config, undefined);
+		// The settings of an MSPM0 peripheral live in libxr_config.yaml too (the UART buffers);
+		// the fixture has no config file, so the entry is there but not present.
+		assert.deepStrictEqual(usedPeripherals(fixture('pins-mspm0g3507.json')).find((used) => used.name === 'UART0')?.config, [
+			{ section: 'UART', key: 'uart0', present: false },
+		]);
 	});
 
 	test('an MSPM0 peripheral carries the settings of its SysConfig project, read-only', () => {
@@ -294,7 +316,7 @@ suite('pin layout view', () => {
 			params: { enabledInterrupts: ['RX', 'TX'], targetBaudRate: 2000000 },
 		});
 		// No libxr_config.yaml for an MSPM0, and a GPIO has no SysConfig settings of its own.
-		assert.strictEqual(uart.config, undefined);
+		assert.deepStrictEqual(uart.config, [{ section: 'UART', key: 'uart0', present: false }]);
 		assert.strictEqual(mspm0.peripherals.GPIOB.sysconfig, undefined);
 		const used = usedPeripherals(result).find((peripheral) => peripheral.name === 'UART0');
 		assert.strictEqual(used?.sysconfig?.params.targetBaudRate, 2000000);
@@ -304,7 +326,7 @@ suite('pin layout view', () => {
 		assert.strictEqual(view.platform, 'stm32');
 		assert.strictEqual(view.sysconfigFile, null);
 		assert.strictEqual(view.peripherals.USART1.sysconfig, undefined);
-		assert.strictEqual(view.peripherals.USART1.config?.present, true);
+		assert.strictEqual(view.peripherals.USART1.config?.[0].present, true);
 	});
 
 	test('an old libxr is reported with what to do, any other failure unchanged', () => {

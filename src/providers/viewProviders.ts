@@ -28,8 +28,9 @@ import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogge
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
 import { detectPinsProject } from '../pins/project';
 import { pinsService, type PinsState } from '../pinsService';
-import { categoryOf, type Category } from '../pins/model';
+import { categoryOf, type Category, type PinsConfigEntry } from '../pins/model';
 import { usedPeripherals, type UsedPeripheral } from '../pins/view';
+import { cliActions, setupAction, sourceToolLabel, platformTitle, watcherPatterns } from '../libxrView';
 
 export type CliRunRequest = {
 	label: string;
@@ -223,38 +224,21 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		if (ctx.platform === 'unknown') {
 			return [
 				messageNode(
-					'No platform recognized: the workspace root needs an STM32CubeMX .ioc, or a SysConfig ti_msp_dl_config.h for an MSPM0.',
+					'No platform recognized: the workspace root needs an STM32CubeMX .ioc, an app.yaml with a .hpmpc under boards/, or a SysConfig .syscfg.',
 				),
 			];
 		}
 		const state = pinsService.state;
-		// The settings of a peripheral are edited in libxr_config.yaml (an STM32 only).
-		const settingsFile = ctx.platform === 'stm32' && ctx.hasLibxrConfig ? ctx.libxrConfigAbs : undefined;
+		// The settings of a peripheral are edited in libxr_config.yaml (its shape is the same on
+		// every platform).
+		const settingsFile = ctx.hasLibxrConfig ? ctx.libxrConfigAbs : undefined;
 
-		if (ctx.platform === 'mspm0') {
-			// The pin layout works for an MSPM0; LibXR code generation is STM32 only.
+		if (!ctx.hasLibxrConfig) {
+			const setup = setupAction(ctx.platform, ctx.xrobotBsp);
 			return [
 				chipNode(ctx, state),
 				...peripheralsNodes(state, settingsFile, ctx.root),
-				messageNode('Code generation: STM32 only'),
-			];
-		}
-
-		if (!ctx.hasLibxrConfig) {
-			return [
-				chipNode(ctx, state),
-				...peripheralsNodes(state, settingsFile),
-				groupNode(
-					'Actions',
-					[
-						actionNode('Configure CubeMX (libxr stm32 setup)', {
-							label: 'libxr stm32 setup',
-							tool: 'libxr',
-							args: ['stm32', 'setup', '-d', '.'],
-						}),
-					],
-					false,
-				),
+				groupNode('Actions', [actionNode(setup.label, setup.request)], false),
 			];
 		}
 
@@ -267,14 +251,17 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			contextValue: 'xrobot.libxr.appMainPath',
 		});
 
+		// The Flash layout is an output of the STM32 generator alone; `libxr gen` for MSPM0 and
+		// HPM writes no flash_map.hpp.
+		const isStm32 = ctx.platform === 'stm32';
 		const flashLayoutNodes = this.buildFlashLayoutNodes(ctx);
 		const flashSummary = this.buildFlashLayoutSummary(ctx);
 		const flashLabel = flashSummary ? `Flash Layout: ${flashSummary}` : 'Flash Layout';
 
 		return [
-			chipNode(ctx, state, this.buildSystemItem(ctx)),
+			chipNode(ctx, state, isStm32 ? this.buildSystemItem(ctx) : undefined),
 			...peripheralsNodes(state, settingsFile),
-			groupNode(flashLabel, flashLayoutNodes, false),
+			...(isStm32 ? [groupNode(flashLabel, flashLayoutNodes, false)] : []),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
 			appMainItem,
@@ -339,55 +326,21 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	}
 
 	private buildActions(ctx: WorkspaceContext): TreeNode[] {
-		const appMainArg = `./${ctx.appMainRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
 		const iocDir = ctx.selectedIoc ? path.dirname(ctx.selectedIoc).replace(/\\/g, '/') : '.';
-		const parseIocOut = stm32ParsedConfigArg();
-		const libxrConfigArg = `./${ctx.libxrConfigRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
-		const flashModel = this.readFlashModel(ctx) ?? 'STM32F103C8';
-		const nodes: TreeNode[] = [];
-		const withXrobot = ctx.xrobotBsp;
-		const xrobotFlag = withXrobot ? ' --xrobot' : '';
-		const projectDir = iocDir === '' ? '.' : iocDir;
-
-		if (ctx.platform === 'stm32') {
-			nodes.push(
-				actionNode('Configure CubeMX (libxr stm32 setup)', {
-					label: 'libxr stm32 setup',
-					tool: 'libxr',
-					args: withXrobot ? ['stm32', 'setup', '-d', '.', '--xrobot'] : ['stm32', 'setup', '-d', '.'],
-				}),
-			);
-			nodes.push(
-				actionNode('Parse IOC (libxr parse)', {
-					label: 'libxr parse',
-					tool: 'libxr',
-					args: ['parse'],
-					promptInput: true,
-					defaultInput: `-d ${iocDir === '' ? '.' : iocDir} -o ${parseIocOut} --verbose`,
-					inputPrompt: `Example: -d <CubeMXDir> -o ${parseIocOut} --verbose`,
-				}),
-				actionNode('Generate STM32 Code (libxr gen)', {
-					label: 'libxr gen',
-					tool: 'libxr',
-					args: ['gen'],
-					promptInput: true,
-					defaultInput: `-i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
-					inputPrompt: `Example: -i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
-				}),
-				actionNode('Show STM32 Flash Info (libxr stm32 flash-info)', {
-					label: 'libxr stm32 flash-info',
-					tool: 'libxr',
-					args: ['stm32', 'flash-info'],
-					promptInput: true,
-					defaultInput: flashModel,
-					inputPrompt: 'Example: STM32F103C8',
-				}),
-			);
+		// One-click generation for every platform: parse from the current project, then generate.
+		const nodes: TreeNode[] = [
+			opNode('Generate LibXR Code', 'xrobot.generateLibxrCode', [], 'parse, then generate', 'play'),
+		];
+		for (const action of cliActions({
+			platform: ctx.platform,
+			xrobotBsp: ctx.xrobotBsp,
+			appMainRel: ctx.appMainRel,
+			libxrConfigRel: ctx.libxrConfigRel,
+			projectDir: iocDir,
+			flashModel: this.readFlashModel(ctx),
+		})) {
+			nodes.push(actionNode(action.label, action.request));
 		}
-		if (nodes.length === 0) {
-			nodes.push(messageNode('No platform-specific actions (need *.ioc in workspace root)'));
-		}
-
 		return nodes;
 	}
 
@@ -898,10 +851,21 @@ function settingsShownInPeripherals(state: PinsState): Map<string, Set<string>> 
 		return shown;
 	}
 	for (const used of usedPeripherals(result)) {
-		if (used.config?.present) {
-			const keys = shown.get(used.config.section) ?? new Set<string>();
-			keys.add(used.config.key);
-			shown.set(used.config.section, keys);
+		for (const entry of used.config ?? []) {
+			if (!entry.present) {
+				continue;
+			}
+			const keys = shown.get(entry.section) ?? new Set<string>();
+			// A keyed entry hides its instance (usart1); a key-less one is a whole section (the
+			// GPIO renames of an HPM) and hides the keys its params name.
+			if (entry.key !== null) {
+				keys.add(entry.key);
+			} else {
+				for (const key of Object.keys(entry.params ?? {})) {
+					keys.add(key);
+				}
+			}
+			shown.set(entry.section, keys);
 		}
 	}
 	return shown;
@@ -1027,7 +991,7 @@ function chipNode(ctx: WorkspaceContext, state: PinsState, systemItem?: TreeNode
 	const children: TreeNode[] = [
 		pinLayoutNode(),
 		fileNode(path.basename(source), path.join(ctx.root, source), source, 'none', {
-			description: ctx.platform === 'mspm0' ? 'SysConfig' : 'STM32CubeMX',
+			description: sourceToolLabel(ctx.platform),
 		}),
 	];
 	if (systemItem) {
@@ -1036,8 +1000,10 @@ function chipNode(ctx: WorkspaceContext, state: PinsState, systemItem?: TreeNode
 	if (state.status === 'error') {
 		children.push(messageNode(state.message, undefined, { iconId: 'error', tooltip: state.message }));
 	}
-	const platform = ctx.platform === 'mspm0' ? 'MSPM0' : 'STM32';
-	return groupNode(result ? result.part : `${platform} project`, children, true, description, { iconId: 'chip', id: 'chip' });
+	return groupNode(result ? result.part : `${platformTitle(ctx.platform)} project`, children, true, description, {
+		iconId: 'chip',
+		id: 'chip',
+	});
 }
 
 const CATEGORY_ORDER: Category[] = ['comm', 'timer', 'analog', 'memory', 'other', 'gpio', 'system'];
@@ -1083,6 +1049,12 @@ function settingText(value: unknown): string {
 	return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
 }
 
+// Where the settings of a config entry live in libxr_config.yaml, such as "USART.usart1" or,
+// for a key-less entry, the section itself ("GPIO").
+function configLabel(entry: PinsConfigEntry): string {
+	return entry.key === null ? entry.section : `${entry.section}.${entry.key}`;
+}
+
 function peripheralTooltip(used: UsedPeripheral): string {
 	const lines = [`**${used.name}** · ${used.kind}`, ''];
 	for (const pin of used.pins) {
@@ -1091,31 +1063,49 @@ function peripheralTooltip(used: UsedPeripheral): string {
 	if (used.sysconfig) {
 		lines.push('', `SysConfig: \`${used.sysconfig.name ?? used.sysconfig.module}\``);
 	}
-	if (used.config) {
-		lines.push('', used.config.present ? `Settings: \`${used.config.section}.${used.config.key}\`` : `Not in libxr_config.yaml (\`${used.config.section}.${used.config.key}\`)`);
+	for (const entry of used.config ?? []) {
+		lines.push('', entry.present ? `Settings: \`${configLabel(entry)}\`` : `Not in libxr_config.yaml (\`${configLabel(entry)}\`)`);
 	}
 	return lines.join('\n');
 }
 
 // A peripheral the project selected. Its settings in libxr_config.yaml are its children and can be
-// edited like the Config File (settingsFile), which regenerates the code.
+// edited like the Config File (settingsFile), which regenerates the code. An MSPM0 also shows the
+// settings of its SysConfig project, which are read-only here.
 function peripheralNode(used: UsedPeripheral, settingsFile?: string, sysconfigFile?: string): PeripheralNode {
 	let children: TreeNode[] = [];
 	if (used.sysconfig) {
-		// An MSPM0: the settings are in the SysConfig project and are read-only here; SysConfig edits them.
 		children = Object.entries(used.sysconfig.params).map(([name, value]) =>
 			messageNode(`${name}: ${settingText(value)}`, undefined, { iconId: 'symbol-field' }),
 		);
-		if (sysconfigFile) {
-			children.push(opNode('Open in SysConfig', 'vscode.open', [vscode.Uri.file(sysconfigFile)], path.basename(sysconfigFile), 'go-to-file'));
+	}
+	let editable = false;
+	// Several channels of one timer (an MSPM0 TIMA, an HPM GPTMR) carry the same parameter
+	// names, so each row is prefixed with its key when more than one is shown.
+	const shown = (used.config ?? []).filter((entry) => entry.present && settingsFile);
+	for (const entry of used.config ?? []) {
+		if (entry.present && settingsFile) {
+			if (used.sysconfig && !editable) {
+				children.push(messageNode('libxr_config.yaml:', undefined, { iconId: 'settings' }));
+			}
+			// A key-less entry is a whole section: its params are the renames of the pins, and
+			// editing one creates it (the generator reads the GPIO renames from this section).
+			const base = entry.key === null ? [entry.section] : [entry.section, entry.key];
+			const prefix = entry.key === null || shown.length < 2 ? '' : `${entry.key}.`;
+			children.push(
+				...toYamlValueNodes(entry.params ?? {}, 0, settingsFile, base, true).map((node) =>
+					prefix && node.type === 'yamlValue' ? { ...node, label: `${prefix}${node.label}` } : node,
+				),
+			);
+			editable = true;
+		} else if (!entry.present) {
+			children.push(messageNode(`Not in libxr_config.yaml yet (${configLabel(entry)})`, undefined, { iconId: 'info' }));
 		}
 	}
-	if (used.config?.present && settingsFile) {
-		children = toYamlValueNodes(used.config.params ?? {}, 0, settingsFile, [used.config.section, used.config.key], true);
-	} else if (used.config && !used.config.present) {
-		children = [messageNode(`Not in libxr_config.yaml yet (${used.config.section}.${used.config.key})`, undefined, { iconId: 'info' })];
+	if (used.sysconfig && sysconfigFile) {
+		children.push(opNode('Open in SysConfig', 'vscode.open', [vscode.Uri.file(sysconfigFile)], path.basename(sysconfigFile), 'go-to-file'));
 	}
-	const status = used.config && !used.config.present ? 'not configured' : '';
+	const status = used.config?.length && !used.config.some((entry) => entry.present) ? 'not configured' : '';
 	return {
 		type: 'peripheral',
 		label: used.name,
@@ -1378,8 +1368,9 @@ function normalizePath(p: string): string {
 }
 
 // `libxr gen` reads the .config.yaml that `libxr parse` writes. That file is ignored by Git,
-// so a fresh clone has none and parse runs first.
-async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
+// so a fresh clone has none and parse runs first. The parse and gen detect the platform by the
+// project directory, so this works for STM32, MSPM0 and HPM alike.
+export async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 	const root = getWorkspaceRoot();
 	if (!root) {
 		return;
@@ -1504,18 +1495,8 @@ export function registerWatchers(context: vscode.ExtensionContext, refreshAll: (
 		return;
 	}
 
-	// Inputs of `xrobot describe` (configs, requests, sources, lock, generated header, the
-	// entry source with its XR_REGISTER lines) and of the LibXR view.
-	const patterns = [
-		'*.ioc',
-		// The SysConfig header of an MSPM0 project (the root, sysconfig/, or a level or two down).
-		'{,*/,*/*/,*/*/*/}ti_msp_dl_config.h',
-		'Modules/modules.yaml',
-		'Modules/sources.yaml',
-		'xrobot.lock',
-		'User/**/*.{yaml,yml}',
-		'User/**/*.{c,cc,cpp,cxx,hpp}',
-	];
+	// The files the two views follow come from libxrView.ts (watcherPatterns).
+	const patterns = watcherPatterns();
 
 	for (const p of patterns) {
 		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, p));

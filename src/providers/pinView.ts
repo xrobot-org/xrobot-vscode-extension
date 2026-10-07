@@ -66,7 +66,7 @@ function show(state: PinsState): void {
 	} else if (state.status === 'error') {
 		latest = { error: state.message };
 	} else if (state.status === 'none') {
-		latest = { error: 'No STM32CubeMX .ioc or SysConfig ti_msp_dl_config.h in the workspace.' };
+		latest = { error: 'No platform recognized: the workspace root needs an STM32CubeMX .ioc, an app.yaml with a .hpmpc under boards/, or a SysConfig .syscfg.' };
 	} else {
 		// A run is going: what is shown stays, marked as being updated.
 		post({ type: 'busy' });

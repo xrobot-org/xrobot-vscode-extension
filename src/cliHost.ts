@@ -14,6 +14,7 @@ import {
 	type Invocation,
 } from './cli/xrobotCli';
 import { parseDescribeOutput, type DescribeResult } from './providers/describeModel';
+import { libxrUpgradeHint, sysconfigEnvHint } from './libxrView';
 
 export const outputChannel = vscode.window.createOutputChannel('XRobot');
 
@@ -35,7 +36,18 @@ export function isXrobotBsp(root: string): boolean {
 
 export function cliEnv(): NodeJS.ProcessEnv {
 	const extraPath = vscode.workspace.getConfiguration('xrobot.cli').get<string>('extraPath', '');
-	return cliEnvironment(process.env, extraPath, process.platform, vscode.env.language);
+	const env = cliEnvironment(process.env, extraPath, process.platform, vscode.env.language);
+	// The SysConfig run of an MSPM0 parse takes the variables the CMake build uses; the settings
+	// provide them when the process environment does not.
+	const sysconfigTool = vscode.workspace.getConfiguration('xrobot.libxr').get<string>('sysconfigTool', '').trim();
+	const sdkDir = vscode.workspace.getConfiguration('xrobot.libxr').get<string>('mspm0SdkDir', '').trim();
+	if (sysconfigTool) {
+		env.SYSCONFIG_TOOL = sysconfigTool;
+	}
+	if (sdkDir) {
+		env.MSPM0_SDK_INSTALL_DIR = sdkDir;
+	}
+	return env;
 }
 
 export function invocationFor(tool: string, root: string, env: NodeJS.ProcessEnv = cliEnv()): Invocation | undefined {
@@ -85,12 +97,16 @@ export async function runLogged(tool: string, args: string[], root: string, opti
 	return outcome;
 }
 
-// Shows a failed outcome with the CLI's own message; returns outcome.ok.
+// Shows a failed outcome with the CLI's own message, plus the hint of a known failure (an old
+// libxr, a missing SysConfig); returns outcome.ok.
 export function reportOutcome(label: string, outcome: CliOutcome): boolean {
 	if (outcome.ok || outcome.cancelled) {
 		return outcome.ok;
 	}
-	void vscode.window.showErrorMessage(`${label} failed: ${outcome.message ?? 'see "XRobot" output'}`, 'Show Output').then((choice) => {
+	const message = outcome.message ?? '';
+	const hint = libxrUpgradeHint(message) ?? sysconfigEnvHint(message);
+	const detail = message ? `${message}${hint ? ` — ${hint}` : ''}` : hint ?? 'see "XRobot" output';
+	void vscode.window.showErrorMessage(`${label} failed: ${detail}`, 'Show Output').then((choice) => {
 		if (choice) {
 			outputChannel.show(true);
 		}

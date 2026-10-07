@@ -6,6 +6,7 @@ import {
 	pickLibxrConfigPath,
 	pickWorkspaceFileForSetting,
 	runCli,
+	runLibxrGenerateCodeFromCurrent,
 	type CliRunRequest,
 	type OpenFileTarget,
 } from '../providers/viewProviders';
@@ -38,6 +39,11 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 	});
 	register('xrobot.runCli', async (request?: CliRunRequest) => {
 		await runCli(request);
+		refreshAll();
+	});
+	// The one-click generation of the sidebar: parse from the current project, then generate.
+	register('xrobot.generateLibxrCode', async () => {
+		await runLibxrGenerateCodeFromCurrent();
 		refreshAll();
 	});
 	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));

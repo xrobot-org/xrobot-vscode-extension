@@ -13,10 +13,13 @@ export type PinsAssignment = {
 	candidates?: string[];
 };
 
-export type PinsConfig = {
-	// Section and key in libxr_config.yaml, such as USART and usart1.
+// One group of the settings of a peripheral in libxr_config.yaml: {section, key} says where the
+// values live and present whether the file has it. A null key is a whole section (the GPIO
+// renames of an HPM), whose params hold the name of every pin of the peripheral, null when the
+// file has none. A PWM instance has an entry per channel.
+export type PinsConfigEntry = {
 	section: string;
-	key: string;
+	key: string | null;
 	present: boolean;
 	params?: Record<string, unknown>;
 };
@@ -52,7 +55,7 @@ export type PinsUsed = {
 	kind: string;
 	// Function -> the pin it uses in the project.
 	pins: Record<string, string>;
-	config?: PinsConfig;
+	config?: PinsConfigEntry[];
 	sysconfig?: PinsSysconfig;
 };
 

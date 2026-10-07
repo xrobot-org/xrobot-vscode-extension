@@ -1,6 +1,6 @@
 // What the pin layout webview shows, computed from the `libxr pins` result. Pure.
 import { packageGeometry, type PackageGeometry, type PinCell } from './geometry';
-import { categoryOf, channelOf, platformLabel, type Category, type PinsAssignment, type PinsConfig, type PinsResult, type PinsSysconfig } from './model';
+import { categoryOf, channelOf, platformLabel, type Category, type PinsAssignment, type PinsConfigEntry, type PinsResult, type PinsSysconfig } from './model';
 
 // The peripheral functions that a pin can carry, from the CLI's own recognition (no second set of
 // naming rules here): the pin name -> instance, kind and function.
@@ -39,7 +39,7 @@ export type PeripheralDetail = {
 	kind: string;
 	category: Category;
 	functions: PeripheralFunction[];
-	config?: PinsConfig;
+	config?: PinsConfigEntry[];
 	sysconfig?: PinsSysconfig;
 	capabilities: string[];
 	// Whether the project selected a pin of it.
@@ -51,7 +51,7 @@ export type UsedPeripheral = {
 	kind: string;
 	category: Category;
 	pins: { function: string; pin: string; position: string }[];
-	config?: PinsConfig;
+	config?: PinsConfigEntry[];
 	sysconfig?: PinsSysconfig;
 };
 
@@ -124,7 +124,12 @@ export function usedPeripherals(result: PinsResult): UsedPeripheral[] {
 		...(peripheral.config ? { config: peripheral.config } : {}),
 		...(peripheral.sysconfig ? { sysconfig: peripheral.sysconfig } : {}),
 	}));
-	const rank = (peripheral: UsedPeripheral): number => (peripheral.config ? (peripheral.config.present ? 0 : 1) : 2);
+	const rank = (peripheral: UsedPeripheral): number => {
+		if (!peripheral.config?.length) {
+			return 2;
+		}
+		return peripheral.config.some((entry) => entry.present) ? 0 : 1;
+	};
 	return used.sort((a, b) => rank(a) - rank(b));
 }
 

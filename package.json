@@ -86,6 +86,11 @@
         "icon": "$(circuit-board)"
       },
       {
+        "command": "xrobot.generateLibxrCode",
+        "title": "XRobot: Generate LibXR Code",
+        "icon": "$(play)"
+      },
+      {
         "command": "xrobot.collapseAllViews",
         "title": "XRobot: Collapse All Views"
       },
@@ -229,6 +234,16 @@
           "type": "string",
           "default": "User/app_main.cpp",
           "description": "Path to app_main.cpp relative to workspace root."
+        },
+        "xrobot.libxr.sysconfigTool": {
+          "type": "string",
+          "default": "",
+          "description": "Path of the TI SysConfig executable (SYSCONFIG_TOOL) for MSPM0 projects. Leave empty to use the environment variable."
+        },
+        "xrobot.libxr.mspm0SdkDir": {
+          "type": "string",
+          "default": "",
+          "description": "MSPM0 SDK installation directory (MSPM0_SDK_INSTALL_DIR) for MSPM0 projects. Leave empty to use the environment variable."
         }
       }
     }

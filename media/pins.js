@@ -282,6 +282,14 @@
 			tool.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
 			bar.append(tool);
 		}
+		if (data.platform === 'mspm0' && data.sysconfigFile) {
+			// .syscfg 在 TI 的 SysConfig 扩展里打开即编辑。
+			// The .syscfg opens in TI's SysConfig extension, which edits the project.
+			const tool = el('button', 'link', 'SysConfig');
+			tool.title = 'Open the .syscfg in SysConfig';
+			tool.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
+			bar.append(tool);
+		}
 		const legendOpen = ui.legend || filters.size > 0;
 		bar.append(toggleButton('Legend' + (filters.size > 0 ? ' · ' + filters.size : ''), 'The categories of the pins; choose one to show only those', legendOpen, () => {
 			ui.legend = !legendOpen;

@@ -2633,7 +2633,14 @@
       ],
       "targetBaudRate": 2000000
      }
-    }
+    },
+    "config": [
+     {
+      "section": "UART",
+      "key": "uart0",
+      "present": false
+     }
+    ]
    }
   }
  }

@@ -1424,11 +1424,13 @@
     "pins": {
      "SCK": "PA5"
     },
-    "config": {
-     "section": "SPI",
-     "key": "spi1",
-     "present": false
-    }
+    "config": [
+     {
+      "section": "SPI",
+      "key": "spi1",
+      "present": false
+     }
+    ]
    },
    "USART1": {
     "kind": "USART",
@@ -1436,17 +1438,19 @@
      "TX": "PA9",
      "RX": "PA10"
     },
-    "config": {
-     "section": "USART",
-     "key": "usart1",
-     "present": true,
-     "params": {
-      "tx_buffer_size": 128,
-      "rx_buffer_size": 128,
-      "tx_queue_size": 5,
-      "dma_section": ""
+    "config": [
+     {
+      "section": "USART",
+      "key": "usart1",
+      "present": true,
+      "params": {
+       "tx_buffer_size": 128,
+       "rx_buffer_size": 128,
+       "tx_queue_size": 5,
+       "dma_section": ""
+      }
      }
-    }
+    ]
    }
   }
  }
