@@ -1,5 +1,59 @@
 # Change Log
 
+## [Unreleased]
+
+### Added
+
+- `XRobot: Show Pin Layout` (also the Pin Layout item and the title bar button of the LibXR
+  view): a panel with the package and pin layout of the project's chip from `libxr pins -d`.
+  The pins the project selected are coloured by peripheral category and labelled with the
+  pin name and the function (`PA9 USART1.TX`) or the GPIO label; the top-left dot marks pin
+  1. The search box and the legend highlight and filter pins; clicking a pin lists the
+  peripheral functions it can carry, and selecting a peripheral shows every pin that can
+  carry each of its functions. Read-only. Needs a libxr release that has `libxr pins`.
+- The panel is the chip: the drawing fills the window, the name and package are written on the
+  chip, the controls (Search, Functions, Legend, Details) and the zoom float over it, and the
+  inspector opens beside it when something is selected. The legend is a panel opened by its
+  button and the inspector's blocks fold; what is open is remembered.
+- The panel zooms with the wheel around the pointer, pans with a drag and fits with a double
+  click. The inspector shows one selection at a time, a pin or a peripheral, in plain
+  sections (what the project uses it as, what else it can be, its settings and pins).
+  Selecting a peripheral in the panel selects it in the Peripherals group, and the other
+  way round.
+- The LibXR view starts with the chip (part, package, pins; Pin Layout, the source file and the
+  system below it), and the Peripherals group sorts what the project selected by category, with
+  coloured icons, a tooltip with the pins, and the settings as children that can be edited like
+  the Config File. GPIO and system start closed.
+- The panel: a zoom percentage, a search that Enter steps through, a Show functions toggle,
+  a legend that filters by category (shown with a project only), keyboard navigation, a loading
+  and an updating indicator, an error box with the CLI message and a link to the output, and the
+  zoom, search and selection kept when the panel is hidden. Selecting a peripheral in the sidebar
+  zooms to its pins.
+- The LibXR view has a Peripherals group: the peripherals the project selected, with their
+  pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
+  panel and the group share one `libxr pins` run per refresh.
+- The settings of an MSPM0 peripheral (baud rate, interrupts, ...) are read from the `.syscfg` and
+  shown read-only in the panel and under the peripheral in the Peripherals group, next to its
+  `libxr_config.yaml` settings.
+- MSPM0 projects (a SysConfig `.syscfg` in the root) and HPM projects (an `app.yaml` with
+  `boards/*/*.hpmpc`) are recognized: the LibXR view shows the platform and the pin layout. The
+  MSPM0 package comes from the SysConfig project; the setting `xrobot.libxr.package` only
+  overrides it.
+- Generate LibXR Code (`libxr parse`, then `libxr gen`) for STM32, MSPM0 and HPM, and the setup
+  of a project without `libxr_config.yaml` (`libxr stm32|mspm0|hpm setup`, with `--xrobot` or
+  `--no-xrobot` by whether the workspace is an XRobot BSP). The settings of the peripherals in
+  `libxr_config.yaml` can be edited for every platform, including the pin renames of an HPM
+  project before its `GPIO` section exists.
+- Open in SysConfig starts the standalone SysConfig on the `.syscfg` of an MSPM0 project; Open in
+  HPM Pinmux Tool opens the `.hpmpc` with HPMicro's extension or offers to install it.
+- Settings `xrobot.libxr.sysconfigTool` and `xrobot.libxr.mspm0SdkDir` (the `SYSCONFIG_TOOL` and
+  `MSPM0_SDK_INSTALL_DIR` of an MSPM0 parse); ignored from an untrusted workspace.
+
+### Changed
+
+- The LibXR view no longer says "Unsupported platform" for a workspace without an `.ioc`; it
+  says what it recognizes.
+
 ## [2.0.0] - 2026-10-04
 
 Requires xrobot 1.0 and its single `xrobot` command (including

@@ -237,6 +237,11 @@ export const libxrArgs = {
 	gen: (input: string, output: string, libxrConfig: string, xrobot: boolean): string[] => [
 		'gen', '-i', input, '-o', output, ...(xrobot ? ['--xrobot'] : []), '--libxr-config', libxrConfig,
 	],
+	// The package and pin layout of the project's chip with the signals the project selected
+	// (needs the libxr release that has `pins`).
+	pins: (projectDir: string, libxrConfig: string, pkg?: string): string[] => [
+		'pins', '-d', projectDir, '-c', libxrConfig, '-f', 'json', ...(pkg ? ['-p', pkg] : []),
+	],
 };
 
 export type NewModuleOptions = {
