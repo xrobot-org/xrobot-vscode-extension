@@ -116,6 +116,17 @@ export function parsePinsOutput(text: string): PinsParse {
 	if (value.project !== undefined && (!isRecord(value.project) || !isRecord(value.project.assignments) || !isRecord(value.project.peripherals))) {
 		return { ok: false, error: 'libxr pins output has an invalid "project"' };
 	}
+	// A libxr built before the settings became a list gives one object per peripheral: read it as a
+	// one-entry list, so the views can always iterate.
+	if (isRecord(value.project)) {
+		for (const used of Object.values(value.project.peripherals as Record<string, unknown>)) {
+			if (isRecord(used) && isRecord(used.config)) {
+				used.config = [used.config];
+			} else if (isRecord(used) && used.config !== undefined && !Array.isArray(used.config)) {
+				delete used.config;
+			}
+		}
+	}
 	return { ok: true, result: value as unknown as PinsResult };
 }
 

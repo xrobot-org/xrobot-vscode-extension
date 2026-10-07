@@ -12,6 +12,7 @@ import {
 } from '../providers/viewProviders';
 import type { InstanceEditTarget } from '../providers/instanceEditor';
 import { showPinLayout, type ShowPinLayoutOptions } from '../providers/pinView';
+import { openInVendorTool } from '../vendorTools';
 import {
 	addModuleInstance,
 	addRepo,
@@ -46,6 +47,10 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 		await runLibxrGenerateCodeFromCurrent();
 		refreshAll();
 	});
+	// The Actions item of an MSPM0 or HPM project passes its platform and configuration file.
+	register('xrobot.openVendorTool', (platform?: string, file?: string) =>
+		typeof platform === 'string' ? openInVendorTool(platform, file) : undefined,
+	);
 	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));
 	register('xrobot.openUrl', (url?: string) => openUrl(url));
 	register('xrobot.refreshAll', () => refreshAll());

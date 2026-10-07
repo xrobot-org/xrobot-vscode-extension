@@ -30,7 +30,7 @@ import { detectPinsProject } from '../pins/project';
 import { pinsService, type PinsState } from '../pinsService';
 import { categoryOf, type Category, type PinsConfigEntry } from '../pins/model';
 import { usedPeripherals, type UsedPeripheral } from '../pins/view';
-import { cliActions, setupAction, sourceToolLabel, platformTitle, watcherPatterns } from '../libxrView';
+import { cliActions, NO_PROJECT_MESSAGE, setupAction, sourceToolLabel, platformTitle, watcherPatterns } from '../libxrView';
 
 export type CliRunRequest = {
 	label: string;
@@ -223,9 +223,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private buildRoot(ctx: WorkspaceContext): TreeNode[] {
 		if (ctx.platform === 'unknown') {
 			return [
-				messageNode(
-					'No platform recognized: the workspace root needs an STM32CubeMX .ioc, an app.yaml with a .hpmpc under boards/, or a SysConfig .syscfg.',
-				),
+				messageNode(NO_PROJECT_MESSAGE),
 			];
 		}
 		const state = pinsService.state;
@@ -238,7 +236,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			return [
 				chipNode(ctx, state),
 				...peripheralsNodes(state, settingsFile, ctx.root),
-				groupNode('Actions', [actionNode(setup.label, setup.request)], false),
+				groupNode('Actions', [actionNode(setup.label, setup.request), ...optional(vendorToolNode(ctx))], false),
 			];
 		}
 
@@ -260,7 +258,7 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		return [
 			chipNode(ctx, state, isStm32 ? this.buildSystemItem(ctx) : undefined),
-			...peripheralsNodes(state, settingsFile),
+			...peripheralsNodes(state, settingsFile, ctx.root),
 			...(isStm32 ? [groupNode(flashLabel, flashLayoutNodes, false)] : []),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
@@ -340,6 +338,10 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			flashModel: this.readFlashModel(ctx),
 		})) {
 			nodes.push(actionNode(action.label, action.request));
+		}
+		const tool = vendorToolNode(ctx);
+		if (tool) {
+			nodes.push(tool);
 		}
 		return nodes;
 	}
@@ -1082,18 +1084,19 @@ function peripheralNode(used: UsedPeripheral, settingsFile?: string, sysconfigFi
 	let editable = false;
 	// Several channels of one timer (an MSPM0 TIMA, an HPM GPTMR) carry the same parameter
 	// names, so each row is prefixed with its key when more than one is shown.
-	const shown = (used.config ?? []).filter((entry) => entry.present && settingsFile);
+	// A key-less entry is a whole section of pin renames (HPM GPIO): its pins are editable even
+	// before the section exists, because writing one creates it.
+	const editableEntry = (entry: PinsConfigEntry): boolean => Boolean(settingsFile) && (entry.present || entry.key === null);
+	const shown = (used.config ?? []).filter(editableEntry);
 	for (const entry of used.config ?? []) {
-		if (entry.present && settingsFile) {
+		if (editableEntry(entry)) {
 			if (used.sysconfig && !editable) {
 				children.push(messageNode('libxr_config.yaml:', undefined, { iconId: 'settings' }));
 			}
-			// A key-less entry is a whole section: its params are the renames of the pins, and
-			// editing one creates it (the generator reads the GPIO renames from this section).
 			const base = entry.key === null ? [entry.section] : [entry.section, entry.key];
 			const prefix = entry.key === null || shown.length < 2 ? '' : `${entry.key}.`;
 			children.push(
-				...toYamlValueNodes(entry.params ?? {}, 0, settingsFile, base, true).map((node) =>
+				...toYamlValueNodes(entry.params ?? {}, 0, settingsFile as string, base, true).map((node) =>
 					prefix && node.type === 'yamlValue' ? { ...node, label: `${prefix}${node.label}` } : node,
 				),
 			);
@@ -1103,7 +1106,7 @@ function peripheralNode(used: UsedPeripheral, settingsFile?: string, sysconfigFi
 		}
 	}
 	if (used.sysconfig && sysconfigFile) {
-		children.push(opNode('Open in SysConfig', 'vscode.open', [vscode.Uri.file(sysconfigFile)], path.basename(sysconfigFile), 'go-to-file'));
+		children.push(opNode('Open in SysConfig', 'xrobot.openVendorTool', ['mspm0', sysconfigFile], path.basename(sysconfigFile), 'go-to-file'));
 	}
 	const status = used.config?.length && !used.config.some((entry) => entry.present) ? 'not configured' : '';
 	return {
@@ -1143,6 +1146,19 @@ function peripheralsNodes(state: PinsState, settingsFile?: string, root?: string
 			  );
 	}).filter((group): group is GroupNode => group !== undefined);
 	return [groupNode('Peripherals', groups, true, `${used.length}`, { iconId: 'symbol-interface', id: 'peripherals' })];
+}
+
+// The action that opens an MSPM0 .syscfg in SysConfig or an HPM .hpmpc in the HPM Pinmux Tool.
+function vendorToolNode(ctx: WorkspaceContext): OpNode | undefined {
+	if ((ctx.platform !== 'mspm0' && ctx.platform !== 'hpm') || !ctx.pinsSource) {
+		return undefined;
+	}
+	const label = ctx.platform === 'mspm0' ? 'Open in SysConfig' : 'Open in HPM Pinmux Tool';
+	return opNode(label, 'xrobot.openVendorTool', [ctx.platform, ctx.pinsSource], path.basename(ctx.pinsSource), 'link-external');
+}
+
+function optional<T>(value: T | undefined): T[] {
+	return value === undefined ? [] : [value];
 }
 
 function opNode(label: string, command: string, args: unknown[] = [], description?: string, iconId?: string): OpNode {
@@ -1323,7 +1339,19 @@ export async function editYamlScalar(filePath?: string, keyPath?: Array<string |
 	if (input === undefined || input === currentText) {
 		return;
 	}
-	doc.setIn(keyPath, parseScalarInput(input));
+	try {
+		// A section written as `GPIO:` (null) is not a map yet: it becomes one.
+		for (let depth = 1; depth < keyPath.length; depth++) {
+			const parent = doc.getIn(keyPath.slice(0, depth));
+			if (parent === null || parent === undefined) {
+				doc.setIn(keyPath.slice(0, depth), doc.createNode({}));
+			}
+		}
+		doc.setIn(keyPath, parseScalarInput(input));
+	} catch (error) {
+		void vscode.window.showErrorMessage(`Cannot edit ${keyPath.join('.')} in ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+		return;
+	}
 	try {
 		fs.writeFileSync(filePath, doc.toString(), 'utf8');
 	} catch (error) {
@@ -1376,6 +1404,12 @@ export async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 		return;
 	}
 	const ioc = resolveIocFile(root, detectIocFiles(root));
+	// From the Command Palette the workspace may hold no project at all: say so instead of
+	// running the CLI into its own "no platform" error.
+	if (!detectPinsProject(root, ioc ? [ioc] : [])) {
+		void vscode.window.showInformationMessage(NO_PROJECT_MESSAGE);
+		return;
+	}
 	const projectDir = ioc ? path.dirname(ioc).replace(/\\/g, '/') : '.';
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp').replace(/\\/g, '/');
 	const libxrConfigRel = getWorkspaceRelativeConfig('xrobot.libxr.configPath', 'User/libxr_config.yaml').replace(/\\/g, '/');

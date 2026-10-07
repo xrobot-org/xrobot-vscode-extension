@@ -274,17 +274,17 @@
 			}));
 		}
 		if (data.platform === 'hpm' && data.sysconfigFile) {
-			// .hpmpc 在 HPM Pinmux Tool 扩展里是它的工程编辑器，打开即用工具编辑。
-			// The .hpmpc is the project editor of the HPM Pinmux Tool extension; opening it edits
-			// the project in that tool.
+			// .hpmpc 由 HPM Pinmux Tool 编辑：装了它的 VS Code 扩展时直接打开，否则扩展提示安装或使用网页版。
+			// The HPM Pinmux Tool edits the .hpmpc: with its VS Code extension installed the file
+			// opens there, otherwise the extension offers to install it or to use the web tool.
 			const tool = el('button', 'link', 'HPM Pinmux Tool');
 			tool.title = 'Open the .hpmpc in the HPM Pinmux Tool';
 			tool.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
 			bar.append(tool);
 		}
 		if (data.platform === 'mspm0' && data.sysconfigFile) {
-			// .syscfg 在 TI 的 SysConfig 扩展里打开即编辑。
-			// The .syscfg opens in TI's SysConfig extension, which edits the project.
+			// .syscfg 在独立版 SysConfig 里编辑（TI 没有编辑它的 VS Code 扩展）。
+			// The standalone SysConfig edits the .syscfg (TI has no VS Code editor for it).
 			const tool = el('button', 'link', 'SysConfig');
 			tool.title = 'Open the .syscfg in SysConfig';
 			tool.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
@@ -801,14 +801,16 @@
 		return wrap;
 	}
 
-	// The settings of a peripheral in libxr_config.yaml.
-	function settings(name, config) {
-		const wrap = block([name, 'Settings'], config.section + '.' + config.key, undefined, 'settings');
-		if (!config.present) {
+	// The settings of a peripheral in libxr_config.yaml: one entry of `libxr pins` (a section and
+	// key such as UART.uart0, or a key-less section of pin renames such as GPIO).
+	function settings(name, entry) {
+		const title = entry.key === null || entry.key === undefined ? entry.section : entry.section + '.' + entry.key;
+		const wrap = block([name, 'Settings'], title, undefined, 'settings');
+		if (!entry.present) {
 			wrap.append(el('p', 'dim', 'Not in libxr_config.yaml yet.'));
 		} else {
-			for (const [key, value] of Object.entries(config.params || {})) {
-				wrap.append(row(key, typeof value === 'object' ? JSON.stringify(value) : String(value)));
+			for (const [key, value] of Object.entries(entry.params || {})) {
+				wrap.append(row(key, value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)));
 			}
 		}
 		if (data.configFile) {
@@ -830,8 +832,8 @@
 			wrap.append(row(key, typeof value === 'object' ? JSON.stringify(value) : String(value)));
 		}
 		if (data.sysconfigFile) {
-			const open = el('button', 'link', 'Open ' + data.sysconfigFile.split('/').pop());
-			open.title = 'Edit the settings in SysConfig';
+			const open = el('button', 'link', 'Open in SysConfig');
+			open.title = 'Edit the settings of ' + data.sysconfigFile.split('/').pop() + ' in SysConfig';
 			open.addEventListener('click', () => vscode.postMessage({ type: 'openSysconfig' }));
 			wrap.append(open);
 		}
@@ -946,17 +948,22 @@
 		if (peripheral.capabilities.length > 0) {
 			card.append(el('p', 'facts', 'Can be used for: ' + peripheral.capabilities.join(', ')));
 		}
-		if (peripheral.config) {
-			card.append(settings(name, peripheral.config));
-		} else if (peripheral.sysconfig) {
+		// An MSPM0 peripheral has its read-only SysConfig settings and its libxr_config.yaml
+		// entries side by side; a timer has one entry per channel.
+		const entries = Array.isArray(peripheral.config) ? peripheral.config : [];
+		if (peripheral.sysconfig) {
 			card.append(sysconfigSettings(name, peripheral.sysconfig));
-		} else if (data.hasProject) {
+		}
+		for (const entry of entries) {
+			card.append(settings(name, entry));
+		}
+		if (!peripheral.sysconfig && entries.length === 0 && data.hasProject) {
 			if (!peripheral.used) {
 				card.append(el('p', 'facts', 'The project does not use it.'));
-			} else if (data.platform === 'stm32') {
-				card.append(el('p', 'facts', 'libxr gen does not generate this peripheral.'));
-			} else if (data.sysconfigFile) {
+			} else if (data.platform === 'mspm0' && data.sysconfigFile) {
 				card.append(el('p', 'facts', 'No settings for it in ' + data.sysconfigFile.split('/').pop() + '.'));
+			} else {
+				card.append(el('p', 'facts', 'libxr gen does not generate this peripheral.'));
 			}
 		}
 		const pins = block([name, 'Pins'], 'Pins', 'Filled: used by the project. Outline: can be used. Choose one to find it.', 'pins');

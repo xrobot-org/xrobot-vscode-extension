@@ -7,7 +7,7 @@ import { parsePinsOutput, pinsFailureHint, type PinsResult } from './pins/model'
 import { detectPinsProject, listIocFiles } from './pins/project';
 
 export type PinsState =
-	// No STM32CubeMX .ioc or SysConfig header in the workspace: the pin layout does not apply.
+	// No STM32CubeMX .ioc, HPM .hpmpc or SysConfig .syscfg in the workspace: the pin layout does not apply.
 	| { status: 'none' }
 	| { status: 'running'; previous?: PinsResult }
 	| { status: 'ok'; result: PinsResult }

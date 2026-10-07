@@ -56,6 +56,22 @@ suite('libxr pins output', () => {
 		}
 	});
 
+	test('the settings of a peripheral are always a list', () => {
+		const base = { model: 'X', platform: 'mspm0', part: 'x', package: 'y', pins: [], peripherals: {} };
+		const project = (config: unknown): string =>
+			JSON.stringify({ ...base, project: { assignments: {}, peripherals: { UART0: { kind: 'UART', pins: {}, config } } } });
+		const read = (config: unknown): unknown => {
+			const parsed = parsePinsOutput(project(config));
+			assert.ok(parsed.ok);
+			return parsed.ok ? parsed.result.project?.peripherals.UART0.config : undefined;
+		};
+		const entry = { section: 'UART', key: 'uart0', present: true, params: {} };
+		assert.deepStrictEqual(read(entry), [entry]);
+		assert.deepStrictEqual(read([entry]), [entry]);
+		assert.strictEqual(read('uart0'), undefined);
+		assert.strictEqual(read(undefined), undefined);
+	});
+
 	test('a byte order mark in front of the JSON is ignored', () => {
 		const text = fs.readFileSync(path.join(FIXTURES, 'pins-stm32f103c8.json'), 'utf8');
 		assert.ok(parsePinsOutput(`﻿${text}`).ok);
@@ -308,18 +324,29 @@ suite('pin layout view', () => {
 		const result = fixture('pins-mspm0g3507.json');
 		const mspm0 = buildView(result);
 		assert.strictEqual(mspm0.platform, 'mspm0');
-		assert.strictEqual(mspm0.sysconfigFile, 'sysconfig/untitled.syscfg');
+		assert.strictEqual(mspm0.sysconfigFile, 'mspm0g3507_minidb48.syscfg');
 		const uart = mspm0.peripherals.UART0;
 		assert.deepStrictEqual(uart.sysconfig, {
 			module: 'UART',
 			name: 'UART_0',
 			params: { enabledInterrupts: ['RX', 'TX'], targetBaudRate: 2000000 },
 		});
-		// No libxr_config.yaml for an MSPM0, and a GPIO has no SysConfig settings of its own.
+		// The fixture's project has no libxr_config.yaml, and a GPIO has no SysConfig settings of its own.
 		assert.deepStrictEqual(uart.config, [{ section: 'UART', key: 'uart0', present: false }]);
 		assert.strictEqual(mspm0.peripherals.GPIOB.sysconfig, undefined);
 		const used = usedPeripherals(result).find((peripheral) => peripheral.name === 'UART0');
 		assert.strictEqual(used?.sysconfig?.params.targetBaudRate, 2000000);
+	});
+
+	test('a peripheral of the project that the catalog does not list can still be selected', () => {
+		const result = fixture('pins-stm32f103c8.json');
+		const config = [{ section: 'GPIO', key: null, present: false, params: { pa10: null } }];
+		result.project!.peripherals.GPIOA = { kind: 'GPIO', pins: { P10: 'PA10' }, config };
+		delete result.peripherals.GPIOA;
+		const detail = buildView(result).peripherals.GPIOA;
+		assert.deepStrictEqual(detail.functions, [{ function: 'P10', pins: ['PA10'], current: 'PA10' }]);
+		assert.deepStrictEqual(detail.config, config);
+		assert.strictEqual(detail.used, true);
 	});
 
 	test('an STM32 has no SysConfig file and its settings stay in libxr_config.yaml', () => {

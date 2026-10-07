@@ -14,7 +14,7 @@ import {
 	type Invocation,
 } from './cli/xrobotCli';
 import { parseDescribeOutput, type DescribeResult } from './providers/describeModel';
-import { libxrUpgradeHint, sysconfigEnvHint } from './libxrView';
+import { libxrUpgradeHint, settingPath, sysconfigEnvHint } from './libxrView';
 
 export const outputChannel = vscode.window.createOutputChannel('XRobot');
 
@@ -37,10 +37,10 @@ export function isXrobotBsp(root: string): boolean {
 export function cliEnv(): NodeJS.ProcessEnv {
 	const extraPath = vscode.workspace.getConfiguration('xrobot.cli').get<string>('extraPath', '');
 	const env = cliEnvironment(process.env, extraPath, process.platform, vscode.env.language);
-	// The SysConfig run of an MSPM0 parse takes the variables the CMake build uses; the settings
-	// provide them when the process environment does not.
-	const sysconfigTool = vscode.workspace.getConfiguration('xrobot.libxr').get<string>('sysconfigTool', '').trim();
-	const sdkDir = vscode.workspace.getConfiguration('xrobot.libxr').get<string>('mspm0SdkDir', '').trim();
+	// The SysConfig run of an MSPM0 parse takes the variables the CMake build uses; a non-empty
+	// setting takes the place of the variable of the process environment.
+	const sysconfigTool = settingPath(vscode.workspace.getConfiguration('xrobot.libxr').get<string>('sysconfigTool', ''));
+	const sdkDir = settingPath(vscode.workspace.getConfiguration('xrobot.libxr').get<string>('mspm0SdkDir', ''));
 	if (sysconfigTool) {
 		env.SYSCONFIG_TOOL = sysconfigTool;
 	}

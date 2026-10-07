@@ -7,6 +7,8 @@ import { getWorkspaceRoot, outputChannel } from '../cliHost';
 import { pinsService, type PinsState } from '../pinsService';
 import { detectPinsProject, listIocFiles } from '../pins/project';
 import { buildView, type ViewData } from '../pins/view';
+import { NO_PROJECT_MESSAGE } from '../libxrView';
+import { openInVendorTool } from '../vendorTools';
 
 type PanelData = ViewData | { error: string };
 
@@ -66,7 +68,7 @@ function show(state: PinsState): void {
 	} else if (state.status === 'error') {
 		latest = { error: state.message };
 	} else if (state.status === 'none') {
-		latest = { error: 'No platform recognized: the workspace root needs an STM32CubeMX .ioc, an app.yaml with a .hpmpc under boards/, or a SysConfig .syscfg.' };
+		latest = { error: NO_PROJECT_MESSAGE };
 	} else {
 		// A run is going: what is shown stays, marked as being updated.
 		post({ type: 'busy' });
@@ -80,8 +82,7 @@ function show(state: PinsState): void {
 }
 
 // Opens a file of the project the CLI named (a path relative to the workspace, or absolute). Only a
-// file inside the workspace: the path comes from the CLI's output. `vscode.open` lets an editor
-// that is registered for the file type (TI's SysConfig for a .syscfg) take it.
+// file inside the workspace: the path comes from the CLI's output.
 async function openProjectFile(file: string | null): Promise<void> {
 	const root = getWorkspaceRoot();
 	if (!root || !file) {
@@ -102,9 +103,7 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 		return;
 	}
 	if (!detectPinsProject(root, listIocFiles(root))) {
-		void vscode.window.showInformationMessage(
-			'No STM32CubeMX .ioc, HPM boards .hpmpc or root SysConfig .syscfg found in the workspace (the pin layout needs one of them).',
-		);
+		void vscode.window.showInformationMessage(NO_PROJECT_MESSAGE);
 		return;
 	}
 	pendingPeripheral = options.peripheral;
@@ -135,7 +134,9 @@ export async function showPinLayout(context: vscode.ExtensionContext, options: S
 		} else if (message.type === 'openConfig') {
 			void openProjectFile(latest && 'configFile' in latest ? latest.configFile : null);
 		} else if (message.type === 'openSysconfig') {
-			void openProjectFile(latest && 'sysconfigFile' in latest ? latest.sysconfigFile : null);
+			if (latest && 'sysconfigFile' in latest) {
+				void openInVendorTool(latest.platform, latest.sysconfigFile);
+			}
 		} else if (message.type === 'showOutput') {
 			outputChannel.show(true);
 		} else if (message.type === 'selection') {

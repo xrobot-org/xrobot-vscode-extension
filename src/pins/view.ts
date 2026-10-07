@@ -193,6 +193,22 @@ export function buildView(result: PinsResult): ViewData {
 			used: project !== undefined,
 		};
 	}
+	// A peripheral of the project that the chip's catalog does not list (the GPIO ports of an HPM)
+	// still has its pins and settings: each function with the pin the project gives it.
+	for (const [name, project] of Object.entries(result.project?.peripherals ?? {})) {
+		if (peripherals[name]) {
+			continue;
+		}
+		peripherals[name] = {
+			kind: project.kind,
+			category: categoryOf(project.kind),
+			functions: Object.entries(project.pins).map(([fn, pin]) => ({ function: fn, pins: [pin], current: pin })),
+			...(project.config ? { config: project.config } : {}),
+			...(project.sysconfig ? { sysconfig: project.sysconfig } : {}),
+			capabilities: [],
+			used: true,
+		};
+	}
 
 	const sourceName = result.source.dataset ?? result.source.vendor ?? '';
 	return {

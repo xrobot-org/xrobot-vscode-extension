@@ -33,11 +33,21 @@
   pins and their settings in `libxr_config.yaml`; clicking one selects it in the panel. The
   panel and the group share one `libxr pins` run per refresh.
 - The settings of an MSPM0 peripheral (baud rate, interrupts, ...) are read from the `.syscfg` and
-  shown read-only in the panel and under the peripheral in the Peripherals group, with an Open
-  in SysConfig item (`vscode.open`).
-- MSPM0 projects (a SysConfig `ti_msp_dl_config.h`) are recognized: the LibXR view shows the
-  platform and the pin layout. The package comes from the SysConfig project (the `.syscfg`);
-  the setting `xrobot.libxr.package` only overrides it.
+  shown read-only in the panel and under the peripheral in the Peripherals group, next to its
+  `libxr_config.yaml` settings.
+- MSPM0 projects (a SysConfig `.syscfg` in the root) and HPM projects (an `app.yaml` with
+  `boards/*/*.hpmpc`) are recognized: the LibXR view shows the platform and the pin layout. The
+  MSPM0 package comes from the SysConfig project; the setting `xrobot.libxr.package` only
+  overrides it.
+- Generate LibXR Code (`libxr parse`, then `libxr gen`) for STM32, MSPM0 and HPM, and the setup
+  of a project without `libxr_config.yaml` (`libxr stm32|mspm0|hpm setup`, with `--xrobot` or
+  `--no-xrobot` by whether the workspace is an XRobot BSP). The settings of the peripherals in
+  `libxr_config.yaml` can be edited for every platform, including the pin renames of an HPM
+  project before its `GPIO` section exists.
+- Open in SysConfig starts the standalone SysConfig on the `.syscfg` of an MSPM0 project; Open in
+  HPM Pinmux Tool opens the `.hpmpc` with HPMicro's extension or offers to install it.
+- Settings `xrobot.libxr.sysconfigTool` and `xrobot.libxr.mspm0SdkDir` (the `SYSCONFIG_TOOL` and
+  `MSPM0_SDK_INSTALL_DIR` of an MSPM0 parse); ignored from an untrusted workspace.
 
 ### Changed
 

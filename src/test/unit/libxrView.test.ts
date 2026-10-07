@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 
-import { cliActions, libxrUpgradeHint, platformTitle, setupAction, sourceToolLabel, sysconfigEnvHint, watcherPatterns } from '../../libxrView';
+import { cliActions, libxrUpgradeHint, platformTitle, settingPath, setupAction, sourceToolLabel, sysconfigEnvHint, sysconfigGuiLaunch, watcherPatterns } from '../../libxrView';
 
 const base = {
 	xrobotBsp: false,
@@ -22,14 +22,44 @@ suite('LibXR view per platform', () => {
 		assert.deepStrictEqual(stm32.request, { label: 'libxr stm32 setup', tool: 'libxr', args: ['stm32', 'setup', '-d', '.'] });
 		const hpm = setupAction('hpm', true);
 		assert.strictEqual(hpm.label, 'Set Up HPM Project (libxr hpm setup)');
-		assert.deepStrictEqual(hpm.request, { label: 'libxr hpm setup', tool: 'libxr', args: ['hpm', 'setup', '-d', '.'] });
+		assert.deepStrictEqual(hpm.request, { label: 'libxr hpm setup', tool: 'libxr', args: ['hpm', 'setup', '-d', '.', '--xrobot'] });
 		const mspm0 = setupAction('mspm0', false);
 		assert.strictEqual(mspm0.label, 'Set Up MSPM0 Project (libxr mspm0 setup)');
-		assert.deepStrictEqual(mspm0.request, { label: 'libxr mspm0 setup', tool: 'libxr', args: ['mspm0', 'setup', '-d', '.'] });
+		assert.deepStrictEqual(mspm0.request, { label: 'libxr mspm0 setup', tool: 'libxr', args: ['mspm0', 'setup', '-d', '.', '--no-xrobot'] });
 	});
 
 	test('an XRobot BSP sets up STM32 with --xrobot', () => {
 		assert.deepStrictEqual(setupAction('stm32', true).request.args, ['stm32', 'setup', '-d', '.', '--xrobot']);
+	});
+
+	test('MSPM0 and HPM setups always pass the XRobot choice, so a project without XRobot gets no XRobot code', () => {
+		// With neither flag `libxr mspm0 setup` and `libxr hpm setup` generate XRobot registrations.
+		for (const platform of ['mspm0', 'hpm'] as const) {
+			assert.strictEqual(setupAction(platform, false).request.args?.at(-1), '--no-xrobot');
+			assert.strictEqual(setupAction(platform, true).request.args?.at(-1), '--xrobot');
+		}
+	});
+
+	test('the SysConfig GUI is started the way sysconfig_gui.bat or sysconfig_gui.sh starts it', () => {
+		assert.deepStrictEqual(
+			sysconfigGuiLaunch('C:\\ti\\sysconfig 1.28.1\\sysconfig_cli.bat', 'C:\\ti\\mspm0_sdk\\', 'D:\\p\\b.syscfg', 'win32'),
+			{
+				command: 'C:\\ti\\sysconfig 1.28.1\\nw\\nw.exe',
+				args: [
+					'C:\\ti\\sysconfig 1.28.1\\app',
+					'--compiler',
+					'gcc',
+					'--product',
+					'C:\\ti\\mspm0_sdk/.metadata/product.json',
+					'D:\\p\\b.syscfg',
+				],
+			},
+		);
+		assert.deepStrictEqual(sysconfigGuiLaunch('/opt/ti/sysconfig_1.28.1/sysconfig_cli.sh', '/opt/ti/sdk', '/p/b.syscfg', 'linux'), {
+			command: '/opt/ti/sysconfig_1.28.1/sysconfig_gui.sh',
+			args: ['--compiler', 'gcc', '--product', '/opt/ti/sdk/.metadata/product.json', '/p/b.syscfg'],
+		});
+		assert.strictEqual(sysconfigGuiLaunch('C:\\ti\\other_tool.exe', 'C:\\sdk', 'b.syscfg', 'win32'), undefined);
 	});
 
 	test('a configured MSPM0 or HPM project keeps only the one-click generation', () => {
@@ -89,6 +119,18 @@ suite('LibXR CLI hints', () => {
 		assert.strictEqual(libxrUpgradeHint('Traceback (most recent call last): ...'), undefined);
 	});
 
+	test('the Chinese messages of an old libxr say to upgrade it too', () => {
+		assert.match(libxrUpgradeHint("libxr: 错误: argument <command>: 无效的选项：'hpm' (choose from parse, gen, stm32)") ?? '', /too old/);
+		assert.match(libxrUpgradeHint('hpmproj: 无法识别工程所属的平台（stm32：含 STM32CubeMX .ioc 文件的目录）') ?? '', /too old/);
+	});
+
+	test('a libxr that lists MSPM0 among its platforms is not too old: the folder holds no project', () => {
+		const message =
+			'empty: no supported platform recognized (stm32: a directory with an STM32CubeMX .ioc file; hpm: an app.yaml ' +
+			'with boards/*/*.hpmpc; mspm0: a directory with a SysConfig .syscfg file)';
+		assert.strictEqual(libxrUpgradeHint(message), undefined);
+	});
+
 	test('the missing-environment error of an MSPM0 parse points at the settings', () => {
 		const message =
 			'mspm0proj: no SysConfig output newer than g3507.syscfg found under build*, and SYSCONFIG_TOOL or ' +
@@ -96,5 +138,19 @@ suite('LibXR CLI hints', () => {
 			'once, or set them and run `libxr parse` again.';
 		assert.match(sysconfigEnvHint(message) ?? '', /^Set SysConfig up for MSPM0/);
 		assert.strictEqual(sysconfigEnvHint(oldCli.parse), undefined);
+	});
+
+	test('the Chinese missing-environment error points at the settings too', () => {
+		assert.match(sysconfigEnvHint('mspm0proj: 未设置 SYSCONFIG_TOOL 或 MSPM0_SDK_INSTALL_DIR') ?? '', /^Set SysConfig up for MSPM0/);
+	});
+});
+
+suite('LibXR path settings', () => {
+	test('a path setting loses its whitespace and the quotes of a copied path', () => {
+		assert.strictEqual(settingPath('  C:/ti/sysconfig/sysconfig_cli.bat  '), 'C:/ti/sysconfig/sysconfig_cli.bat');
+		assert.strictEqual(settingPath('"C:/Program Files/ti/sysconfig_cli.bat"'), 'C:/Program Files/ti/sysconfig_cli.bat');
+		assert.strictEqual(settingPath("'/opt/ti/mspm0_sdk'"), '/opt/ti/mspm0_sdk');
+		assert.strictEqual(settingPath('"half'), '"half');
+		assert.strictEqual(settingPath(''), '');
 	});
 });

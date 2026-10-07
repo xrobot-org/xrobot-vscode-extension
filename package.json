@@ -29,10 +29,12 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In an untrusted workspace the workspace's own values of xrobot.cli.extraPath and xrobot.cli.pythonPath are ignored, so the workspace cannot choose which programs the extension starts.",
+      "description": "In an untrusted workspace the workspace's own values of xrobot.cli.extraPath, xrobot.cli.pythonPath, xrobot.libxr.sysconfigTool and xrobot.libxr.mspm0SdkDir are ignored, so the workspace cannot choose which programs the extension and the LibXR tools start.",
       "restrictedConfigurations": [
         "xrobot.cli.extraPath",
-        "xrobot.cli.pythonPath"
+        "xrobot.cli.pythonPath",
+        "xrobot.libxr.sysconfigTool",
+        "xrobot.libxr.mspm0SdkDir"
       ]
     }
   },
@@ -89,6 +91,10 @@
         "command": "xrobot.generateLibxrCode",
         "title": "XRobot: Generate LibXR Code",
         "icon": "$(play)"
+      },
+      {
+        "command": "xrobot.openVendorTool",
+        "title": "XRobot: Open in Vendor Tool"
       },
       {
         "command": "xrobot.collapseAllViews",
@@ -172,6 +178,10 @@
         {
           "command": "xrobot.editYamlScalar",
           "when": "false"
+        },
+        {
+          "command": "xrobot.openVendorTool",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -237,11 +247,13 @@
         },
         "xrobot.libxr.sysconfigTool": {
           "type": "string",
+          "scope": "machine-overridable",
           "default": "",
-          "description": "Path of the TI SysConfig executable (SYSCONFIG_TOOL) for MSPM0 projects. Leave empty to use the environment variable."
+          "description": "Path of the TI SysConfig command-line tool (SYSCONFIG_TOOL: sysconfig_cli.bat or sysconfig_cli.sh) for MSPM0 projects; libxr parse runs it, and Open in SysConfig starts the GUI of the same installation. Leave empty to use the environment variable."
         },
         "xrobot.libxr.mspm0SdkDir": {
           "type": "string",
+          "scope": "machine-overridable",
           "default": "",
           "description": "MSPM0 SDK installation directory (MSPM0_SDK_INSTALL_DIR) for MSPM0 projects. Leave empty to use the environment variable."
         }

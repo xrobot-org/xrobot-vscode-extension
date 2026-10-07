@@ -2585,7 +2585,7 @@
   "directory": "/project",
   "source": "sysconfig/ti_msp_dl_config.h",
   "libxr_config": null,
-  "sysconfig_file": "sysconfig/untitled.syscfg",
+  "sysconfig_file": "mspm0g3507_minidb48.syscfg",
   "assignments": {
    "PA0": {
     "signal": "UART0.TX",
