@@ -3,7 +3,7 @@
   "publisher": "XRobot",
   "displayName": "XRobot",
   "description": "VS Code extension for XRobot",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "media/xrobot.png",
   "repository": {
     "type": "git",
@@ -22,16 +22,19 @@
   ],
   "activationEvents": [
     "onCommand:xrobot.helloWorld",
+    "onCommand:xrobot.showPinLayout",
     "onView:xrobot.libxrView",
     "onView:xrobot.xrobotView"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In an untrusted workspace the workspace's own values of xrobot.cli.extraPath and xrobot.cli.pythonPath are ignored, so the workspace cannot choose which programs the extension starts.",
+      "description": "In an untrusted workspace the workspace's own values of xrobot.cli.extraPath, xrobot.cli.pythonPath, xrobot.libxr.sysconfigTool and xrobot.libxr.mspm0SdkDir are ignored, so the workspace cannot choose which programs the extension and the LibXR tools start.",
       "restrictedConfigurations": [
         "xrobot.cli.extraPath",
-        "xrobot.cli.pythonPath"
+        "xrobot.cli.pythonPath",
+        "xrobot.libxr.sysconfigTool",
+        "xrobot.libxr.mspm0SdkDir"
       ]
     }
   },
@@ -78,6 +81,20 @@
       {
         "command": "xrobot.refreshAll",
         "title": "XRobot: Refresh All"
+      },
+      {
+        "command": "xrobot.showPinLayout",
+        "title": "XRobot: Show Pin Layout",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "xrobot.generateLibxrCode",
+        "title": "XRobot: Generate LibXR Code",
+        "icon": "$(play)"
+      },
+      {
+        "command": "xrobot.openVendorTool",
+        "title": "XRobot: Open in Vendor Tool"
       },
       {
         "command": "xrobot.collapseAllViews",
@@ -161,9 +178,18 @@
         {
           "command": "xrobot.editYamlScalar",
           "when": "false"
+        },
+        {
+          "command": "xrobot.openVendorTool",
+          "when": "false"
         }
       ],
       "view/title": [
+        {
+          "command": "xrobot.showPinLayout",
+          "when": "view == xrobot.libxrView",
+          "group": "navigation@1"
+        },
         {
           "command": "xrobot.collapseAllViews",
           "when": "view == xrobot.libxrView || view == xrobot.xrobotView",
@@ -204,6 +230,11 @@
           "default": "",
           "description": "Preferred STM32 .ioc file relative to workspace root. Leave empty to auto-detect first root-level *.ioc."
         },
+        "xrobot.libxr.package": {
+          "type": "string",
+          "default": "",
+          "description": "Overrides the package of the chip in the pin layout (for an MSPM0: LQFP-64, PM, VQFN-48, ...). Leave empty: an MSPM0 takes it from its SysConfig project (the .syscfg) and an STM32 from its model."
+        },
         "xrobot.libxr.configPath": {
           "type": "string",
           "default": "User/libxr_config.yaml",
@@ -213,6 +244,18 @@
           "type": "string",
           "default": "User/app_main.cpp",
           "description": "Path to app_main.cpp relative to workspace root."
+        },
+        "xrobot.libxr.sysconfigTool": {
+          "type": "string",
+          "scope": "machine-overridable",
+          "default": "",
+          "description": "Path of the TI SysConfig command-line tool (SYSCONFIG_TOOL: sysconfig_cli.bat or sysconfig_cli.sh) for MSPM0 projects; libxr parse runs it, and Open in SysConfig starts the GUI of the same installation. Leave empty to use the environment variable."
+        },
+        "xrobot.libxr.mspm0SdkDir": {
+          "type": "string",
+          "scope": "machine-overridable",
+          "default": "",
+          "description": "MSPM0 SDK installation directory (MSPM0_SDK_INSTALL_DIR) for MSPM0 projects. Leave empty to use the environment variable."
         }
       }
     }

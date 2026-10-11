@@ -6,10 +6,13 @@ import {
 	pickLibxrConfigPath,
 	pickWorkspaceFileForSetting,
 	runCli,
+	runLibxrGenerateCodeFromCurrent,
 	type CliRunRequest,
 	type OpenFileTarget,
 } from '../providers/viewProviders';
 import type { InstanceEditTarget } from '../providers/instanceEditor';
+import { showPinLayout, type ShowPinLayoutOptions } from '../providers/pinView';
+import { openInVendorTool } from '../vendorTools';
 import {
 	addModuleInstance,
 	addRepo,
@@ -39,9 +42,22 @@ export function registerXrobotCommands(context: vscode.ExtensionContext, refresh
 		await runCli(request);
 		refreshAll();
 	});
+	// The one-click generation of the sidebar: parse from the current project, then generate.
+	register('xrobot.generateLibxrCode', async () => {
+		await runLibxrGenerateCodeFromCurrent();
+		refreshAll();
+	});
+	// The Actions item of an MSPM0 or HPM project passes its platform and configuration file.
+	register('xrobot.openVendorTool', (platform?: string, file?: string) =>
+		typeof platform === 'string' ? openInVendorTool(platform, file) : undefined,
+	);
 	register('xrobot.openFile', (target?: OpenFileTarget | string) => openWorkspaceFile(target));
 	register('xrobot.openUrl', (url?: string) => openUrl(url));
 	register('xrobot.refreshAll', () => refreshAll());
+	// A Peripherals item passes { peripheral }; the title bar button and the palette pass nothing.
+	register('xrobot.showPinLayout', (options?: ShowPinLayoutOptions) =>
+		showPinLayout(context, typeof options?.peripheral === 'string' ? { peripheral: options.peripheral } : {}),
+	);
 	register('xrobot.collapseAllViews', async () => {
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.libxrView.collapseAll');
 		await vscode.commands.executeCommand('workbench.actions.treeView.xrobot.xrobotView.collapseAll');

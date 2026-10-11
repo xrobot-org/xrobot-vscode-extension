@@ -1,4 +1,4 @@
-// Adapter for the `xrobot` CLI (XRobot 1.0) and the LibXR console scripts.
+// Adapter for the `xrobot` CLI (xrobot 1.0) and the LibXR console scripts.
 // No `vscode` import: argument building, tool resolution, decoding and exit-code handling
 // are unit-tested with a fake executable.
 //
@@ -236,6 +236,11 @@ export const libxrArgs = {
 	parse: (projectDir: string, output: string): string[] => ['parse', '-d', projectDir, '-o', output],
 	gen: (input: string, output: string, libxrConfig: string, xrobot: boolean): string[] => [
 		'gen', '-i', input, '-o', output, ...(xrobot ? ['--xrobot'] : []), '--libxr-config', libxrConfig,
+	],
+	// The package and pin layout of the project's chip with the signals the project selected
+	// (needs the libxr release that has `pins`).
+	pins: (projectDir: string, libxrConfig: string, pkg?: string): string[] => [
+		'pins', '-d', projectDir, '-c', libxrConfig, '-f', 'json', ...(pkg ? ['-p', pkg] : []),
 	],
 };
 

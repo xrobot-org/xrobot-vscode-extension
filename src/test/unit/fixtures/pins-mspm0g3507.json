@@ -1,0 +1,2647 @@
+{
+ "model": "MSPM0G3507",
+ "platform": "mspm0",
+ "part": "MSPM0G3507",
+ "package": "LQFP-64(PM)",
+ "pin_count": 64,
+ "source": {
+  "vendor": "Texas Instruments",
+  "dataset": "SysConfig dist/deviceData",
+  "version": "1.26.2+4477",
+  "license": "TI limited license (TI devices only)"
+ },
+ "peripherals": {
+  "ADC0": {
+   "kind": "ADC",
+   "signals": {
+    "0": [
+     "PA27"
+    ],
+    "1": [
+     "PA26"
+    ],
+    "2": [
+     "PA25"
+    ],
+    "3": [
+     "PA24"
+    ],
+    "4": [
+     "PB25"
+    ],
+    "5": [
+     "PB24"
+    ],
+    "6": [
+     "PB20"
+    ],
+    "7": [
+     "PA22"
+    ],
+    "8": [
+     "PA21"
+    ],
+    "12": [
+     "PA14"
+    ]
+   }
+  },
+  "ADC1": {
+   "kind": "ADC",
+   "signals": {
+    "0": [
+     "PA15"
+    ],
+    "1": [
+     "PA16"
+    ],
+    "2": [
+     "PA17"
+    ],
+    "3": [
+     "PA18"
+    ],
+    "4": [
+     "PB17"
+    ],
+    "5": [
+     "PB18"
+    ],
+    "6": [
+     "PB19"
+    ],
+    "7": [
+     "PA21"
+    ],
+    "8": [
+     "PA22"
+    ]
+   }
+  },
+  "CANFD0": {
+   "kind": "CANFD",
+   "signals": {
+    "CANRX": [
+     "PA13",
+     "PA27"
+    ],
+    "CANTX": [
+     "PA12",
+     "PA26"
+    ]
+   }
+  },
+  "COMP0": {
+   "kind": "COMP",
+   "signals": {
+    "IN0+": [
+     "PA26"
+    ],
+    "IN0-": [
+     "PA27"
+    ],
+    "IN1+": [
+     "PA18"
+    ],
+    "IN1-": [
+     "PA17"
+    ],
+    "IN2+": [
+     "PA14"
+    ],
+    "IN2-": [
+     "PA13"
+    ],
+    "IN3+": [
+     "PA15"
+    ],
+    "OUT": [
+     "PB23",
+     "PA7",
+     "PA11"
+    ]
+   }
+  },
+  "COMP1": {
+   "kind": "COMP",
+   "signals": {
+    "IN0+": [
+     "PB26"
+    ],
+    "IN0-": [
+     "PB27"
+    ],
+    "IN1+": [
+     "PB24"
+    ],
+    "IN1-": [
+     "PA23"
+    ],
+    "IN2+": [
+     "PB18"
+    ],
+    "IN2-": [
+     "PB17"
+    ],
+    "IN3+": [
+     "PA15"
+    ],
+    "OUT": [
+     "PA3",
+     "PB8",
+     "PB10"
+    ]
+   }
+  },
+  "COMP2": {
+   "kind": "COMP",
+   "signals": {
+    "IN0+": [
+     "PB21"
+    ],
+    "IN0-": [
+     "PB22"
+    ],
+    "IN1+": [
+     "PB19"
+    ],
+    "IN1-": [
+     "PA21"
+    ],
+    "OUT": [
+     "PA16",
+     "PB19",
+     "PB27"
+    ]
+   }
+  },
+  "DAC0": {
+   "kind": "DAC",
+   "signals": {
+    "OUT": [
+     "PA15"
+    ]
+   }
+  },
+  "DEBUGSS": {
+   "kind": "DEBUGSS",
+   "signals": {
+    "SWCLK": [
+     "PA20"
+    ],
+    "SWDIO": [
+     "PA19"
+    ]
+   }
+  },
+  "GPAMP": {
+   "kind": "GPAMP",
+   "signals": {
+    "IN+": [
+     "PA26"
+    ],
+    "IN-": [
+     "PA18"
+    ],
+    "OUT": [
+     "PA22"
+    ]
+   }
+  },
+  "GPIOA": {
+   "kind": "GPIO",
+   "signals": {
+    "P0": [
+     "PA0"
+    ],
+    "P1": [
+     "PA1"
+    ],
+    "P2": [
+     "PA2"
+    ],
+    "P3": [
+     "PA3"
+    ],
+    "P4": [
+     "PA4"
+    ],
+    "P5": [
+     "PA5"
+    ],
+    "P6": [
+     "PA6"
+    ],
+    "P7": [
+     "PA7"
+    ],
+    "P8": [
+     "PA8"
+    ],
+    "P9": [
+     "PA9"
+    ],
+    "P10": [
+     "PA10"
+    ],
+    "P11": [
+     "PA11"
+    ],
+    "P12": [
+     "PA12"
+    ],
+    "P13": [
+     "PA13"
+    ],
+    "P14": [
+     "PA14"
+    ],
+    "P15": [
+     "PA15"
+    ],
+    "P16": [
+     "PA16"
+    ],
+    "P17": [
+     "PA17"
+    ],
+    "P18": [
+     "PA18"
+    ],
+    "P19": [
+     "PA19"
+    ],
+    "P20": [
+     "PA20"
+    ],
+    "P21": [
+     "PA21"
+    ],
+    "P22": [
+     "PA22"
+    ],
+    "P23": [
+     "PA23"
+    ],
+    "P24": [
+     "PA24"
+    ],
+    "P25": [
+     "PA25"
+    ],
+    "P26": [
+     "PA26"
+    ],
+    "P27": [
+     "PA27"
+    ],
+    "P28": [
+     "PA28"
+    ],
+    "P29": [
+     "PA29"
+    ],
+    "P30": [
+     "PA30"
+    ],
+    "P31": [
+     "PA31"
+    ]
+   }
+  },
+  "GPIOB": {
+   "kind": "GPIO",
+   "signals": {
+    "P0": [
+     "PB0"
+    ],
+    "P1": [
+     "PB1"
+    ],
+    "P2": [
+     "PB2"
+    ],
+    "P3": [
+     "PB3"
+    ],
+    "P4": [
+     "PB4"
+    ],
+    "P5": [
+     "PB5"
+    ],
+    "P6": [
+     "PB6"
+    ],
+    "P7": [
+     "PB7"
+    ],
+    "P8": [
+     "PB8"
+    ],
+    "P9": [
+     "PB9"
+    ],
+    "P10": [
+     "PB10"
+    ],
+    "P11": [
+     "PB11"
+    ],
+    "P12": [
+     "PB12"
+    ],
+    "P13": [
+     "PB13"
+    ],
+    "P14": [
+     "PB14"
+    ],
+    "P15": [
+     "PB15"
+    ],
+    "P16": [
+     "PB16"
+    ],
+    "P17": [
+     "PB17"
+    ],
+    "P18": [
+     "PB18"
+    ],
+    "P19": [
+     "PB19"
+    ],
+    "P20": [
+     "PB20"
+    ],
+    "P21": [
+     "PB21"
+    ],
+    "P22": [
+     "PB22"
+    ],
+    "P23": [
+     "PB23"
+    ],
+    "P24": [
+     "PB24"
+    ],
+    "P25": [
+     "PB25"
+    ],
+    "P26": [
+     "PB26"
+    ],
+    "P27": [
+     "PB27"
+    ]
+   }
+  },
+  "I2C0": {
+   "kind": "I2C",
+   "signals": {
+    "SCL": [
+     "PA1",
+     "PA31",
+     "PA11"
+    ],
+    "SDA": [
+     "PA0",
+     "PA28",
+     "PA10"
+    ]
+   }
+  },
+  "I2C1": {
+   "kind": "I2C",
+   "signals": {
+    "SCL": [
+     "PA15",
+     "PA17",
+     "PA29",
+     "PA4",
+     "PB2",
+     "PA11"
+    ],
+    "SDA": [
+     "PA16",
+     "PA18",
+     "PA30",
+     "PA3",
+     "PB3",
+     "PA10"
+    ]
+   }
+  },
+  "OPA0": {
+   "kind": "OPA",
+   "signals": {
+    "IN0+": [
+     "PA26"
+    ],
+    "IN0-": [
+     "PA27"
+    ],
+    "IN1+": [
+     "PA25"
+    ],
+    "IN1-": [
+     "PA24"
+    ],
+    "IN2+": [
+     "PA15"
+    ],
+    "OUT": [
+     "PA22"
+    ]
+   }
+  },
+  "OPA1": {
+   "kind": "OPA",
+   "signals": {
+    "IN0+": [
+     "PB19"
+    ],
+    "IN0-": [
+     "PB20"
+    ],
+    "IN1+": [
+     "PA18"
+    ],
+    "IN1-": [
+     "PA17"
+    ],
+    "IN2+": [
+     "PA15"
+    ],
+    "OUT": [
+     "PA16"
+    ]
+   }
+  },
+  "RTC": {
+   "kind": "RTC",
+   "signals": {
+    "RTC_OUT": [
+     "PA27",
+     "PA9"
+    ]
+   }
+  },
+  "SPI0": {
+   "kind": "SPI",
+   "signals": {
+    "CS0": [
+     "PB25",
+     "PA2",
+     "PA8"
+    ],
+    "CS1_POCI1": [
+     "PB24",
+     "PB26",
+     "PA3",
+     "PB6"
+    ],
+    "CS2_POCI2": [
+     "PB20",
+     "PA24",
+     "PB7"
+    ],
+    "CS3_CD_POCI3": [
+     "PB14",
+     "PB24",
+     "PA23"
+    ],
+    "PICO": [
+     "PA14",
+     "PB17",
+     "PA5",
+     "PA9"
+    ],
+    "POCI": [
+     "PA13",
+     "PB19",
+     "PA4",
+     "PA10"
+    ],
+    "SCLK": [
+     "PA12",
+     "PB18",
+     "PA6",
+     "PA11"
+    ]
+   }
+  },
+  "SPI1": {
+   "kind": "SPI",
+   "signals": {
+    "CS0": [
+     "PB20",
+     "PA26",
+     "PA2",
+     "PB6"
+    ],
+    "CS1_POCI1": [
+     "PB17",
+     "PB27",
+     "PA27"
+    ],
+    "CS2_POCI2": [
+     "PA15",
+     "PB18",
+     "PB0"
+    ],
+    "CS3_CD_POCI3": [
+     "PB14",
+     "PA25",
+     "PB1"
+    ],
+    "PICO": [
+     "PB15",
+     "PA18",
+     "PB22",
+     "PB8"
+    ],
+    "POCI": [
+     "PB14",
+     "PA16",
+     "PB21",
+     "PB7"
+    ],
+    "SCLK": [
+     "PB16",
+     "PA17",
+     "PB23",
+     "PB9"
+    ]
+   }
+  },
+  "SYSCTL": {
+   "kind": "SYSCTL",
+   "signals": {
+    "CLK_OUT": [
+     "PA14",
+     "PA22",
+     "PA31",
+     "PA7",
+     "PA9",
+     "PA10",
+     "PB11"
+    ],
+    "FCC_IN": [
+     "PA12",
+     "PA16",
+     "PA0",
+     "PA5"
+    ],
+    "HFCLKIN": [
+     "PA6"
+    ],
+    "HFXIN": [
+     "PA5"
+    ],
+    "HFXOUT": [
+     "PA6"
+    ],
+    "LFCLKIN": [
+     "PA4"
+    ],
+    "LFXIN": [
+     "PA3"
+    ],
+    "LFXOUT": [
+     "PA4"
+    ],
+    "NRST": [
+     "NRST"
+    ],
+    "ROSC": [
+     "PA2"
+    ]
+   }
+  },
+  "TIMA0": {
+   "kind": "TIMA",
+   "signals": {
+    "CCP0": [
+     "PB14",
+     "PA21",
+     "PA0",
+     "PA8",
+     "PB8"
+    ],
+    "CCP0_CMPL": [
+     "PA22",
+     "PA9",
+     "PB9"
+    ],
+    "CCP1": [
+     "PA22",
+     "PB20",
+     "PA1",
+     "PA3",
+     "PA7",
+     "PA9",
+     "PB9",
+     "PB12"
+    ],
+    "CCP1_CMPL": [
+     "PB13",
+     "PB24",
+     "PA25",
+     "PA4"
+    ],
+    "CCP2": [
+     "PA15",
+     "PB17",
+     "PB20",
+     "PA3",
+     "PB0",
+     "PA7",
+     "PB4",
+     "PA10",
+     "PB12"
+    ],
+    "CCP2_CMPL": [
+     "PA16",
+     "PB18",
+     "PA6",
+     "PB1",
+     "PB5",
+     "PA11"
+    ],
+    "CCP3": [
+     "PB13",
+     "PA12",
+     "PA17",
+     "PB24",
+     "PA23",
+     "PA25",
+     "PB26",
+     "PA28",
+     "PA4",
+     "PB2"
+    ],
+    "CCP3_CMPL": [
+     "PA13",
+     "PA18",
+     "PA24",
+     "PB27",
+     "PA31",
+     "PB3"
+    ],
+    "FAULT0": [
+     "PB23",
+     "PA26",
+     "PA28",
+     "PA6"
+    ],
+    "FAULT1": [
+     "PB20",
+     "PA0",
+     "PA5",
+     "PB12"
+    ],
+    "FAULT2": [
+     "PB25",
+     "PA27",
+     "PA1"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMA1": {
+   "kind": "TIMA",
+   "signals": {
+    "CCP0": [
+     "PA15",
+     "PA17",
+     "PB17",
+     "PB26",
+     "PA28",
+     "PB0",
+     "PB2",
+     "PB4",
+     "PA10"
+    ],
+    "CCP0_CMPL": [
+     "PA15",
+     "PB24",
+     "PB4",
+     "PA8",
+     "PB6"
+    ],
+    "CCP1": [
+     "PA16",
+     "PA18",
+     "PB18",
+     "PA24",
+     "PB27",
+     "PA31",
+     "PB1",
+     "PB3",
+     "PB5",
+     "PA11"
+    ],
+    "CCP1_CMPL": [
+     "PA16",
+     "PB20",
+     "PB5",
+     "PA9",
+     "PB7"
+    ],
+    "FAULT0": [
+     "PB23",
+     "PA26",
+     "PA28",
+     "PA6"
+    ],
+    "FAULT1": [
+     "PB20",
+     "PA0",
+     "PA5",
+     "PB12"
+    ],
+    "FAULT2": [
+     "PB25",
+     "PA27",
+     "PA1"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMG0": {
+   "kind": "TIMG",
+   "signals": {
+    "CCP0": [
+     "PA12",
+     "PA23",
+     "PA5",
+     "PB10"
+    ],
+    "CCP1": [
+     "PA13",
+     "PA24",
+     "PA6",
+     "PB11"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMG6": {
+   "kind": "TIMG",
+   "signals": {
+    "CCP0": [
+     "PA21",
+     "PB26",
+     "PA29",
+     "PA5",
+     "PB2",
+     "PB6",
+     "PB10"
+    ],
+    "CCP1": [
+     "PA22",
+     "PB27",
+     "PA30",
+     "PA6",
+     "PB3",
+     "PB7",
+     "PB11"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMG7": {
+   "kind": "TIMG",
+   "signals": {
+    "CCP0": [
+     "PB15",
+     "PA17",
+     "PA23",
+     "PA26",
+     "PA28",
+     "PA3"
+    ],
+    "CCP1": [
+     "PB16",
+     "PA18",
+     "PB19",
+     "PA24",
+     "PA27",
+     "PA31",
+     "PA2",
+     "PA4",
+     "PA7"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMG8": {
+   "kind": "TIMG",
+   "signals": {
+    "CCP0": [
+     "PB15",
+     "PA21",
+     "PB21",
+     "PA23",
+     "PA26",
+     "PA1",
+     "PA29",
+     "PA3",
+     "PA5",
+     "PA7",
+     "PB6",
+     "PB10"
+    ],
+    "CCP1": [
+     "PB16",
+     "PB19",
+     "PA22",
+     "PB22",
+     "PA27",
+     "PA0",
+     "PA30",
+     "PA2",
+     "PA4",
+     "PA6",
+     "PB7",
+     "PB11"
+    ],
+    "IDX": [
+     "PB14",
+     "PA15",
+     "PA1",
+     "PA7"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "TIMG12": {
+   "kind": "TIMG",
+   "signals": {
+    "CCP0": [
+     "PB13",
+     "PA14",
+     "PB20",
+     "PA10"
+    ],
+    "CCP1": [
+     "PB14",
+     "PB24",
+     "PA25",
+     "PA31"
+    ]
+   },
+   "capabilities": [
+    "pwm"
+   ]
+  },
+  "UART0": {
+   "kind": "UART",
+   "signals": {
+    "CTS": [
+     "PA14",
+     "PB19",
+     "PB25",
+     "PA9"
+    ],
+    "RTS": [
+     "PA15",
+     "PB26",
+     "PA8"
+    ],
+    "RX": [
+     "PA1",
+     "PA31",
+     "PB1",
+     "PA11"
+    ],
+    "TX": [
+     "PA0",
+     "PA28",
+     "PB0",
+     "PA10"
+    ]
+   }
+  },
+  "UART1": {
+   "kind": "UART",
+   "signals": {
+    "CTS": [
+     "PA21",
+     "PB2",
+     "PB8"
+    ],
+    "RTS": [
+     "PA22",
+     "PB3",
+     "PB9"
+    ],
+    "RX": [
+     "PA18",
+     "PB5",
+     "PA9",
+     "PB7"
+    ],
+    "TX": [
+     "PA17",
+     "PB4",
+     "PA8",
+     "PB6"
+    ]
+   }
+  },
+  "UART2": {
+   "kind": "UART",
+   "signals": {
+    "CTS": [
+     "PA30",
+     "PA3",
+     "PB2",
+     "PB6"
+    ],
+    "RTS": [
+     "PA29",
+     "PA4",
+     "PB3",
+     "PB7"
+    ],
+    "RX": [
+     "PB16",
+     "PB18",
+     "PA22",
+     "PA24"
+    ],
+    "TX": [
+     "PB15",
+     "PB17",
+     "PA21",
+     "PA23"
+    ]
+   }
+  },
+  "UART3": {
+   "kind": "UART",
+   "signals": {
+    "CTS": [
+     "PB15",
+     "PA12",
+     "PA23",
+     "PB4"
+    ],
+    "RTS": [
+     "PB16",
+     "PA13",
+     "PA24",
+     "PB5"
+    ],
+    "RX": [
+     "PB13",
+     "PA13",
+     "PA25",
+     "PB3"
+    ],
+    "TX": [
+     "PA14",
+     "PA26",
+     "PB2",
+     "PB12"
+    ]
+   }
+  },
+  "VREF": {
+   "kind": "VREF",
+   "signals": {
+    "VREF+": [
+     "PA23"
+    ],
+    "VREF-": [
+     "PA21"
+    ]
+   }
+  }
+ },
+ "pins": [
+  {
+   "position": "1",
+   "name": "PB13",
+   "type": "Default",
+   "signals": [
+    "PB13",
+    "UART3.RX",
+    "TIMA0.CCP3",
+    "TIMG12.CCP0",
+    "TIMA0.CCP1_CMPL"
+   ],
+   "iomux_pincm": 30,
+   "modes": {
+    "PB13": 1,
+    "UART3.RX": 2,
+    "TIMA0.CCP3": 3,
+    "TIMG12.CCP0": 4,
+    "TIMA0.CCP1_CMPL": 5
+   }
+  },
+  {
+   "position": "2",
+   "name": "PB14",
+   "type": "Default",
+   "signals": [
+    "PB14",
+    "SPI1.CS3_CD_POCI3",
+    "SPI1.POCI",
+    "SPI0.CS3_CD_POCI3",
+    "TIMG12.CCP1",
+    "TIMG8.IDX",
+    "TIMA0.CCP0"
+   ],
+   "iomux_pincm": 31,
+   "modes": {
+    "PB14": 1,
+    "SPI1.CS3_CD_POCI3": 2,
+    "SPI1.POCI": 3,
+    "SPI0.CS3_CD_POCI3": 4,
+    "TIMG12.CCP1": 5,
+    "TIMG8.IDX": 6,
+    "TIMA0.CCP0": 7
+   }
+  },
+  {
+   "position": "3",
+   "name": "PB15",
+   "type": "Default",
+   "signals": [
+    "PB15",
+    "UART2.TX",
+    "SPI1.PICO",
+    "UART3.CTS",
+    "TIMG8.CCP0",
+    "TIMG7.CCP0"
+   ],
+   "iomux_pincm": 32,
+   "modes": {
+    "PB15": 1,
+    "UART2.TX": 2,
+    "SPI1.PICO": 3,
+    "UART3.CTS": 4,
+    "TIMG8.CCP0": 5,
+    "TIMG7.CCP0": 6
+   }
+  },
+  {
+   "position": "4",
+   "name": "PB16",
+   "type": "Default",
+   "signals": [
+    "PB16",
+    "UART2.RX",
+    "SPI1.SCLK",
+    "UART3.RTS",
+    "TIMG8.CCP1",
+    "TIMG7.CCP1"
+   ],
+   "iomux_pincm": 33,
+   "modes": {
+    "PB16": 1,
+    "UART2.RX": 2,
+    "SPI1.SCLK": 3,
+    "UART3.RTS": 4,
+    "TIMG8.CCP1": 5,
+    "TIMG7.CCP1": 6
+   }
+  },
+  {
+   "position": "5",
+   "name": "PA12",
+   "type": "Default",
+   "signals": [
+    "PA12",
+    "UART3.CTS",
+    "SPI0.SCLK",
+    "TIMG0.CCP0",
+    "CANFD0.CANTX",
+    "TIMA0.CCP3",
+    "SYSCTL.FCC_IN"
+   ],
+   "iomux_pincm": 34,
+   "modes": {
+    "PA12": 1,
+    "UART3.CTS": 2,
+    "SPI0.SCLK": 3,
+    "TIMG0.CCP0": 4,
+    "CANFD0.CANTX": 5,
+    "TIMA0.CCP3": 6,
+    "SYSCTL.FCC_IN": 7
+   }
+  },
+  {
+   "position": "6",
+   "name": "PA13",
+   "type": "Default",
+   "signals": [
+    "PA13",
+    "UART3.RTS",
+    "SPI0.POCI",
+    "UART3.RX",
+    "TIMG0.CCP1",
+    "CANFD0.CANRX",
+    "TIMA0.CCP3_CMPL",
+    "COMP0.IN2-"
+   ],
+   "iomux_pincm": 35,
+   "modes": {
+    "PA13": 1,
+    "UART3.RTS": 2,
+    "SPI0.POCI": 3,
+    "UART3.RX": 4,
+    "TIMG0.CCP1": 5,
+    "CANFD0.CANRX": 6,
+    "TIMA0.CCP3_CMPL": 7,
+    "COMP0.IN2-": 0
+   }
+  },
+  {
+   "position": "7",
+   "name": "PA14",
+   "type": "Default",
+   "signals": [
+    "PA14",
+    "UART0.CTS",
+    "SPI0.PICO",
+    "UART3.TX",
+    "TIMG12.CCP0",
+    "SYSCTL.CLK_OUT",
+    "COMP0.IN2+",
+    "ADC0.12"
+   ],
+   "iomux_pincm": 36,
+   "modes": {
+    "PA14": 1,
+    "UART0.CTS": 2,
+    "SPI0.PICO": 3,
+    "UART3.TX": 4,
+    "TIMG12.CCP0": 5,
+    "SYSCTL.CLK_OUT": 6,
+    "COMP0.IN2+": 0,
+    "ADC0.12": 0
+   }
+  },
+  {
+   "position": "8",
+   "name": "PA15",
+   "type": "Default",
+   "signals": [
+    "PA15",
+    "UART0.RTS",
+    "SPI1.CS2_POCI2",
+    "I2C1.SCL",
+    "TIMA1.CCP0",
+    "TIMG8.IDX",
+    "TIMA1.CCP0_CMPL",
+    "TIMA0.CCP2",
+    "ADC1.0",
+    "DAC0.OUT",
+    "COMP0.IN3+",
+    "COMP1.IN3+",
+    "OPA0.IN2+",
+    "OPA1.IN2+"
+   ],
+   "iomux_pincm": 37,
+   "modes": {
+    "PA15": 1,
+    "UART0.RTS": 2,
+    "SPI1.CS2_POCI2": 3,
+    "I2C1.SCL": 4,
+    "TIMA1.CCP0": 5,
+    "TIMG8.IDX": 6,
+    "TIMA1.CCP0_CMPL": 7,
+    "TIMA0.CCP2": 8,
+    "ADC1.0": 0,
+    "DAC0.OUT": 0,
+    "COMP0.IN3+": 0,
+    "COMP1.IN3+": 0,
+    "OPA0.IN2+": 0,
+    "OPA1.IN2+": 0
+   }
+  },
+  {
+   "position": "9",
+   "name": "PA16",
+   "type": "Default",
+   "signals": [
+    "PA16",
+    "COMP2.OUT",
+    "SPI1.POCI",
+    "I2C1.SDA",
+    "TIMA1.CCP1",
+    "TIMA1.CCP1_CMPL",
+    "TIMA0.CCP2_CMPL",
+    "SYSCTL.FCC_IN",
+    "ADC1.1",
+    "OPA1.OUT"
+   ],
+   "iomux_pincm": 38,
+   "modes": {
+    "PA16": 1,
+    "COMP2.OUT": 2,
+    "SPI1.POCI": 3,
+    "I2C1.SDA": 4,
+    "TIMA1.CCP1": 5,
+    "TIMA1.CCP1_CMPL": 6,
+    "TIMA0.CCP2_CMPL": 7,
+    "SYSCTL.FCC_IN": 8,
+    "ADC1.1": 0,
+    "OPA1.OUT": 0
+   }
+  },
+  {
+   "position": "10",
+   "name": "PA17",
+   "type": "Default",
+   "signals": [
+    "PA17",
+    "UART1.TX",
+    "SPI1.SCLK",
+    "I2C1.SCL",
+    "TIMA0.CCP3",
+    "TIMG7.CCP0",
+    "TIMA1.CCP0",
+    "ADC1.2",
+    "OPA1.IN1-",
+    "COMP0.IN1-"
+   ],
+   "iomux_pincm": 39,
+   "modes": {
+    "PA17": 1,
+    "UART1.TX": 2,
+    "SPI1.SCLK": 3,
+    "I2C1.SCL": 4,
+    "TIMA0.CCP3": 5,
+    "TIMG7.CCP0": 6,
+    "TIMA1.CCP0": 7,
+    "ADC1.2": 0,
+    "OPA1.IN1-": 0,
+    "COMP0.IN1-": 0
+   }
+  },
+  {
+   "position": "11",
+   "name": "PA18",
+   "type": "Default",
+   "signals": [
+    "PA18",
+    "UART1.RX",
+    "SPI1.PICO",
+    "I2C1.SDA",
+    "TIMA0.CCP3_CMPL",
+    "TIMG7.CCP1",
+    "TIMA1.CCP1",
+    "ADC1.3",
+    "OPA1.IN1+",
+    "COMP0.IN1+",
+    "GPAMP.IN-"
+   ],
+   "iomux_pincm": 40,
+   "modes": {
+    "PA18": 1,
+    "UART1.RX": 2,
+    "SPI1.PICO": 3,
+    "I2C1.SDA": 4,
+    "TIMA0.CCP3_CMPL": 5,
+    "TIMG7.CCP1": 6,
+    "TIMA1.CCP1": 7,
+    "ADC1.3": 0,
+    "OPA1.IN1+": 0,
+    "COMP0.IN1+": 0,
+    "GPAMP.IN-": 0
+   }
+  },
+  {
+   "position": "12",
+   "name": "PA19",
+   "type": "Default",
+   "signals": [
+    "PA19",
+    "DEBUGSS.SWDIO"
+   ],
+   "iomux_pincm": 41,
+   "modes": {
+    "PA19": 1,
+    "DEBUGSS.SWDIO": 2
+   }
+  },
+  {
+   "position": "13",
+   "name": "PA20",
+   "type": "Default",
+   "signals": [
+    "PA20",
+    "DEBUGSS.SWCLK"
+   ],
+   "iomux_pincm": 42,
+   "modes": {
+    "PA20": 1,
+    "DEBUGSS.SWCLK": 2
+   }
+  },
+  {
+   "position": "14",
+   "name": "PB17",
+   "type": "Default",
+   "signals": [
+    "PB17",
+    "UART2.TX",
+    "SPI0.PICO",
+    "SPI1.CS1_POCI1",
+    "TIMA1.CCP0",
+    "TIMA0.CCP2",
+    "ADC1.4",
+    "COMP1.IN2-"
+   ],
+   "iomux_pincm": 43,
+   "modes": {
+    "PB17": 1,
+    "UART2.TX": 2,
+    "SPI0.PICO": 3,
+    "SPI1.CS1_POCI1": 4,
+    "TIMA1.CCP0": 5,
+    "TIMA0.CCP2": 6,
+    "ADC1.4": 0,
+    "COMP1.IN2-": 0
+   }
+  },
+  {
+   "position": "15",
+   "name": "PB18",
+   "type": "Default",
+   "signals": [
+    "PB18",
+    "UART2.RX",
+    "SPI0.SCLK",
+    "SPI1.CS2_POCI2",
+    "TIMA1.CCP1",
+    "TIMA0.CCP2_CMPL",
+    "ADC1.5",
+    "COMP1.IN2+"
+   ],
+   "iomux_pincm": 44,
+   "modes": {
+    "PB18": 1,
+    "UART2.RX": 2,
+    "SPI0.SCLK": 3,
+    "SPI1.CS2_POCI2": 4,
+    "TIMA1.CCP1": 5,
+    "TIMA0.CCP2_CMPL": 6,
+    "ADC1.5": 0,
+    "COMP1.IN2+": 0
+   }
+  },
+  {
+   "position": "16",
+   "name": "PB19",
+   "type": "Default",
+   "signals": [
+    "PB19",
+    "COMP2.OUT",
+    "SPI0.POCI",
+    "TIMG8.CCP1",
+    "UART0.CTS",
+    "TIMG7.CCP1",
+    "ADC1.6",
+    "COMP2.IN1+",
+    "OPA1.IN0+"
+   ],
+   "iomux_pincm": 45,
+   "modes": {
+    "PB19": 1,
+    "COMP2.OUT": 2,
+    "SPI0.POCI": 3,
+    "TIMG8.CCP1": 4,
+    "UART0.CTS": 5,
+    "TIMG7.CCP1": 6,
+    "ADC1.6": 0,
+    "COMP2.IN1+": 0,
+    "OPA1.IN0+": 0
+   }
+  },
+  {
+   "position": "17",
+   "name": "PA21",
+   "type": "Default",
+   "signals": [
+    "PA21",
+    "UART2.TX",
+    "TIMG8.CCP0",
+    "UART1.CTS",
+    "TIMA0.CCP0",
+    "TIMG6.CCP0",
+    "ADC1.7",
+    "ADC0.8",
+    "COMP2.IN1-",
+    "VREF.VREF-"
+   ],
+   "iomux_pincm": 46,
+   "modes": {
+    "PA21": 1,
+    "UART2.TX": 2,
+    "TIMG8.CCP0": 3,
+    "UART1.CTS": 4,
+    "TIMA0.CCP0": 5,
+    "TIMG6.CCP0": 6,
+    "ADC1.7": 0,
+    "ADC0.8": 0,
+    "COMP2.IN1-": 0,
+    "VREF.VREF-": 0
+   }
+  },
+  {
+   "position": "18",
+   "name": "PA22",
+   "type": "Default",
+   "signals": [
+    "PA22",
+    "UART2.RX",
+    "TIMG8.CCP1",
+    "UART1.RTS",
+    "TIMA0.CCP1",
+    "SYSCTL.CLK_OUT",
+    "TIMA0.CCP0_CMPL",
+    "TIMG6.CCP1",
+    "ADC0.7",
+    "ADC1.8",
+    "OPA0.OUT",
+    "GPAMP.OUT"
+   ],
+   "iomux_pincm": 47,
+   "modes": {
+    "PA22": 1,
+    "UART2.RX": 2,
+    "TIMG8.CCP1": 3,
+    "UART1.RTS": 4,
+    "TIMA0.CCP1": 5,
+    "SYSCTL.CLK_OUT": 6,
+    "TIMA0.CCP0_CMPL": 7,
+    "TIMG6.CCP1": 8,
+    "ADC0.7": 0,
+    "ADC1.8": 0,
+    "OPA0.OUT": 0,
+    "GPAMP.OUT": 0
+   }
+  },
+  {
+   "position": "19",
+   "name": "PB20",
+   "type": "Default",
+   "signals": [
+    "PB20",
+    "SPI0.CS2_POCI2",
+    "SPI1.CS0",
+    "TIMA0.CCP2",
+    "TIMG12.CCP0",
+    "TIMA0.FAULT1",
+    "TIMA1.FAULT1",
+    "TIMA0.CCP1",
+    "TIMA1.CCP1_CMPL",
+    "ADC0.6",
+    "OPA1.IN0-"
+   ],
+   "iomux_pincm": 48,
+   "modes": {
+    "PB20": 1,
+    "SPI0.CS2_POCI2": 2,
+    "SPI1.CS0": 3,
+    "TIMA0.CCP2": 4,
+    "TIMG12.CCP0": 5,
+    "TIMA0.FAULT1": 6,
+    "TIMA1.FAULT1": 6,
+    "TIMA0.CCP1": 7,
+    "TIMA1.CCP1_CMPL": 8,
+    "ADC0.6": 0,
+    "OPA1.IN0-": 0
+   }
+  },
+  {
+   "position": "20",
+   "name": "PB21",
+   "type": "Default",
+   "signals": [
+    "PB21",
+    "SPI1.POCI",
+    "TIMG8.CCP0",
+    "COMP2.IN0+"
+   ],
+   "iomux_pincm": 49,
+   "modes": {
+    "PB21": 1,
+    "SPI1.POCI": 2,
+    "TIMG8.CCP0": 3,
+    "COMP2.IN0+": 0
+   }
+  },
+  {
+   "position": "21",
+   "name": "PB22",
+   "type": "Default",
+   "signals": [
+    "PB22",
+    "SPI1.PICO",
+    "TIMG8.CCP1",
+    "COMP2.IN0-"
+   ],
+   "iomux_pincm": 50,
+   "modes": {
+    "PB22": 1,
+    "SPI1.PICO": 2,
+    "TIMG8.CCP1": 3,
+    "COMP2.IN0-": 0
+   }
+  },
+  {
+   "position": "22",
+   "name": "PB23",
+   "type": "Default",
+   "signals": [
+    "PB23",
+    "SPI1.SCLK",
+    "COMP0.OUT",
+    "TIMA0.FAULT0",
+    "TIMA1.FAULT0"
+   ],
+   "iomux_pincm": 51,
+   "modes": {
+    "PB23": 1,
+    "SPI1.SCLK": 2,
+    "COMP0.OUT": 3,
+    "TIMA0.FAULT0": 4,
+    "TIMA1.FAULT0": 4
+   }
+  },
+  {
+   "position": "23",
+   "name": "PB24",
+   "type": "Default",
+   "signals": [
+    "PB24",
+    "SPI0.CS3_CD_POCI3",
+    "SPI0.CS1_POCI1",
+    "TIMA0.CCP3",
+    "TIMG12.CCP1",
+    "TIMA0.CCP1_CMPL",
+    "TIMA1.CCP0_CMPL",
+    "ADC0.5",
+    "COMP1.IN1+"
+   ],
+   "iomux_pincm": 52,
+   "modes": {
+    "PB24": 1,
+    "SPI0.CS3_CD_POCI3": 2,
+    "SPI0.CS1_POCI1": 3,
+    "TIMA0.CCP3": 4,
+    "TIMG12.CCP1": 5,
+    "TIMA0.CCP1_CMPL": 6,
+    "TIMA1.CCP0_CMPL": 7,
+    "ADC0.5": 0,
+    "COMP1.IN1+": 0
+   }
+  },
+  {
+   "position": "24",
+   "name": "PA23",
+   "type": "Default",
+   "signals": [
+    "PA23",
+    "UART2.TX",
+    "SPI0.CS3_CD_POCI3",
+    "TIMA0.CCP3",
+    "TIMG0.CCP0",
+    "UART3.CTS",
+    "TIMG7.CCP0",
+    "TIMG8.CCP0",
+    "COMP1.IN1-",
+    "VREF.VREF+"
+   ],
+   "iomux_pincm": 53,
+   "modes": {
+    "PA23": 1,
+    "UART2.TX": 2,
+    "SPI0.CS3_CD_POCI3": 3,
+    "TIMA0.CCP3": 4,
+    "TIMG0.CCP0": 5,
+    "UART3.CTS": 6,
+    "TIMG7.CCP0": 7,
+    "TIMG8.CCP0": 8,
+    "COMP1.IN1-": 0,
+    "VREF.VREF+": 0
+   }
+  },
+  {
+   "position": "25",
+   "name": "PA24",
+   "type": "Default",
+   "signals": [
+    "PA24",
+    "UART2.RX",
+    "SPI0.CS2_POCI2",
+    "TIMA0.CCP3_CMPL",
+    "TIMG0.CCP1",
+    "UART3.RTS",
+    "TIMG7.CCP1",
+    "TIMA1.CCP1",
+    "ADC0.3",
+    "OPA0.IN1-"
+   ],
+   "iomux_pincm": 54,
+   "modes": {
+    "PA24": 1,
+    "UART2.RX": 2,
+    "SPI0.CS2_POCI2": 3,
+    "TIMA0.CCP3_CMPL": 4,
+    "TIMG0.CCP1": 5,
+    "UART3.RTS": 6,
+    "TIMG7.CCP1": 7,
+    "TIMA1.CCP1": 8,
+    "ADC0.3": 0,
+    "OPA0.IN1-": 0
+   }
+  },
+  {
+   "position": "26",
+   "name": "PA25",
+   "type": "Default",
+   "signals": [
+    "PA25",
+    "UART3.RX",
+    "SPI1.CS3_CD_POCI3",
+    "TIMG12.CCP1",
+    "TIMA0.CCP3",
+    "TIMA0.CCP1_CMPL",
+    "ADC0.2",
+    "OPA0.IN1+"
+   ],
+   "iomux_pincm": 55,
+   "modes": {
+    "PA25": 1,
+    "UART3.RX": 2,
+    "SPI1.CS3_CD_POCI3": 3,
+    "TIMG12.CCP1": 4,
+    "TIMA0.CCP3": 5,
+    "TIMA0.CCP1_CMPL": 6,
+    "ADC0.2": 0,
+    "OPA0.IN1+": 0
+   }
+  },
+  {
+   "position": "27",
+   "name": "PB25",
+   "type": "Default",
+   "signals": [
+    "PB25",
+    "UART0.CTS",
+    "SPI0.CS0",
+    "TIMA0.FAULT2",
+    "TIMA1.FAULT2",
+    "ADC0.4"
+   ],
+   "iomux_pincm": 56,
+   "modes": {
+    "PB25": 1,
+    "UART0.CTS": 2,
+    "SPI0.CS0": 3,
+    "TIMA0.FAULT2": 4,
+    "TIMA1.FAULT2": 4,
+    "ADC0.4": 0
+   }
+  },
+  {
+   "position": "28",
+   "name": "PB26",
+   "type": "Default",
+   "signals": [
+    "PB26",
+    "UART0.RTS",
+    "SPI0.CS1_POCI1",
+    "TIMA0.CCP3",
+    "TIMG6.CCP0",
+    "TIMA1.CCP0",
+    "COMP1.IN0+"
+   ],
+   "iomux_pincm": 57,
+   "modes": {
+    "PB26": 1,
+    "UART0.RTS": 2,
+    "SPI0.CS1_POCI1": 3,
+    "TIMA0.CCP3": 4,
+    "TIMG6.CCP0": 5,
+    "TIMA1.CCP0": 6,
+    "COMP1.IN0+": 0
+   }
+  },
+  {
+   "position": "29",
+   "name": "PB27",
+   "type": "Default",
+   "signals": [
+    "PB27",
+    "COMP2.OUT",
+    "SPI1.CS1_POCI1",
+    "TIMA0.CCP3_CMPL",
+    "TIMG6.CCP1",
+    "TIMA1.CCP1",
+    "COMP1.IN0-"
+   ],
+   "iomux_pincm": 58,
+   "modes": {
+    "PB27": 1,
+    "COMP2.OUT": 2,
+    "SPI1.CS1_POCI1": 3,
+    "TIMA0.CCP3_CMPL": 4,
+    "TIMG6.CCP1": 5,
+    "TIMA1.CCP1": 6,
+    "COMP1.IN0-": 0
+   }
+  },
+  {
+   "position": "30",
+   "name": "PA26",
+   "type": "Default",
+   "signals": [
+    "PA26",
+    "UART3.TX",
+    "SPI1.CS0",
+    "TIMG8.CCP0",
+    "TIMA0.FAULT0",
+    "TIMA1.FAULT0",
+    "CANFD0.CANTX",
+    "TIMG7.CCP0",
+    "ADC0.1",
+    "COMP0.IN0+",
+    "OPA0.IN0+",
+    "GPAMP.IN+"
+   ],
+   "iomux_pincm": 59,
+   "modes": {
+    "PA26": 1,
+    "UART3.TX": 2,
+    "SPI1.CS0": 3,
+    "TIMG8.CCP0": 4,
+    "TIMA0.FAULT0": 5,
+    "TIMA1.FAULT0": 5,
+    "CANFD0.CANTX": 6,
+    "TIMG7.CCP0": 7,
+    "ADC0.1": 0,
+    "COMP0.IN0+": 0,
+    "OPA0.IN0+": 0,
+    "GPAMP.IN+": 0
+   }
+  },
+  {
+   "position": "31",
+   "name": "PA27",
+   "type": "Default",
+   "signals": [
+    "PA27",
+    "RTC.RTC_OUT",
+    "SPI1.CS1_POCI1",
+    "TIMG8.CCP1",
+    "TIMA0.FAULT2",
+    "TIMA1.FAULT2",
+    "CANFD0.CANRX",
+    "TIMG7.CCP1",
+    "ADC0.0",
+    "COMP0.IN0-",
+    "OPA0.IN0-"
+   ],
+   "iomux_pincm": 60,
+   "modes": {
+    "PA27": 1,
+    "RTC.RTC_OUT": 2,
+    "SPI1.CS1_POCI1": 3,
+    "TIMG8.CCP1": 4,
+    "TIMA0.FAULT2": 5,
+    "TIMA1.FAULT2": 5,
+    "CANFD0.CANRX": 6,
+    "TIMG7.CCP1": 7,
+    "ADC0.0": 0,
+    "COMP0.IN0-": 0,
+    "OPA0.IN0-": 0
+   }
+  },
+  {
+   "position": "32",
+   "name": "VCORE",
+   "type": "Power",
+   "signals": [],
+   "iomux_pincm": null,
+   "modes": {}
+  },
+  {
+   "position": "33",
+   "name": "PA0",
+   "type": "Default",
+   "signals": [
+    "PA0",
+    "UART0.TX",
+    "I2C0.SDA",
+    "TIMA0.CCP0",
+    "TIMA0.FAULT1",
+    "TIMA1.FAULT1",
+    "TIMG8.CCP1",
+    "SYSCTL.FCC_IN"
+   ],
+   "iomux_pincm": 1,
+   "modes": {
+    "PA0": 1,
+    "UART0.TX": 2,
+    "I2C0.SDA": 3,
+    "TIMA0.CCP0": 4,
+    "TIMA0.FAULT1": 5,
+    "TIMA1.FAULT1": 5,
+    "TIMG8.CCP1": 6,
+    "SYSCTL.FCC_IN": 7
+   }
+  },
+  {
+   "position": "34",
+   "name": "PA1",
+   "type": "Default",
+   "signals": [
+    "PA1",
+    "UART0.RX",
+    "I2C0.SCL",
+    "TIMA0.CCP1",
+    "TIMA0.FAULT2",
+    "TIMA1.FAULT2",
+    "TIMG8.IDX",
+    "TIMG8.CCP0"
+   ],
+   "iomux_pincm": 2,
+   "modes": {
+    "PA1": 1,
+    "UART0.RX": 2,
+    "I2C0.SCL": 3,
+    "TIMA0.CCP1": 4,
+    "TIMA0.FAULT2": 5,
+    "TIMA1.FAULT2": 5,
+    "TIMG8.IDX": 6,
+    "TIMG8.CCP0": 7
+   }
+  },
+  {
+   "position": "35",
+   "name": "PA28",
+   "type": "Default",
+   "signals": [
+    "PA28",
+    "UART0.TX",
+    "I2C0.SDA",
+    "TIMA0.CCP3",
+    "TIMA0.FAULT0",
+    "TIMA1.FAULT0",
+    "TIMG7.CCP0",
+    "TIMA1.CCP0"
+   ],
+   "iomux_pincm": 3,
+   "modes": {
+    "PA28": 1,
+    "UART0.TX": 2,
+    "I2C0.SDA": 3,
+    "TIMA0.CCP3": 4,
+    "TIMA0.FAULT0": 5,
+    "TIMA1.FAULT0": 5,
+    "TIMG7.CCP0": 6,
+    "TIMA1.CCP0": 7
+   }
+  },
+  {
+   "position": "36",
+   "name": "PA29",
+   "type": "Default",
+   "signals": [
+    "PA29",
+    "I2C1.SCL",
+    "UART2.RTS",
+    "TIMG8.CCP0",
+    "TIMG6.CCP0"
+   ],
+   "iomux_pincm": 4,
+   "modes": {
+    "PA29": 1,
+    "I2C1.SCL": 2,
+    "UART2.RTS": 3,
+    "TIMG8.CCP0": 4,
+    "TIMG6.CCP0": 5
+   }
+  },
+  {
+   "position": "37",
+   "name": "PA30",
+   "type": "Default",
+   "signals": [
+    "PA30",
+    "I2C1.SDA",
+    "UART2.CTS",
+    "TIMG8.CCP1",
+    "TIMG6.CCP1"
+   ],
+   "iomux_pincm": 5,
+   "modes": {
+    "PA30": 1,
+    "I2C1.SDA": 2,
+    "UART2.CTS": 3,
+    "TIMG8.CCP1": 4,
+    "TIMG6.CCP1": 5
+   }
+  },
+  {
+   "position": "38",
+   "name": "NRST",
+   "type": "Fixed",
+   "signals": [
+    "SYSCTL.NRST"
+   ],
+   "iomux_pincm": null,
+   "modes": {
+    "SYSCTL.NRST": 0
+   }
+  },
+  {
+   "position": "39",
+   "name": "PA31",
+   "type": "Default",
+   "signals": [
+    "PA31",
+    "UART0.RX",
+    "I2C0.SCL",
+    "TIMA0.CCP3_CMPL",
+    "TIMG12.CCP1",
+    "SYSCTL.CLK_OUT",
+    "TIMG7.CCP1",
+    "TIMA1.CCP1"
+   ],
+   "iomux_pincm": 6,
+   "modes": {
+    "PA31": 1,
+    "UART0.RX": 2,
+    "I2C0.SCL": 3,
+    "TIMA0.CCP3_CMPL": 4,
+    "TIMG12.CCP1": 5,
+    "SYSCTL.CLK_OUT": 6,
+    "TIMG7.CCP1": 7,
+    "TIMA1.CCP1": 8
+   }
+  },
+  {
+   "position": "40",
+   "name": "VDD",
+   "type": "Power",
+   "signals": [],
+   "iomux_pincm": null,
+   "modes": {}
+  },
+  {
+   "position": "41",
+   "name": "VSS",
+   "type": "Ground",
+   "signals": [],
+   "iomux_pincm": null,
+   "modes": {}
+  },
+  {
+   "position": "42",
+   "name": "PA2",
+   "type": "Default",
+   "signals": [
+    "PA2",
+    "TIMG8.CCP1",
+    "SPI0.CS0",
+    "TIMG7.CCP1",
+    "SPI1.CS0",
+    "SYSCTL.ROSC"
+   ],
+   "iomux_pincm": 7,
+   "modes": {
+    "PA2": 1,
+    "TIMG8.CCP1": 2,
+    "SPI0.CS0": 3,
+    "TIMG7.CCP1": 4,
+    "SPI1.CS0": 5,
+    "SYSCTL.ROSC": 0
+   }
+  },
+  {
+   "position": "43",
+   "name": "PA3",
+   "type": "Default",
+   "signals": [
+    "PA3",
+    "TIMG8.CCP0",
+    "SPI0.CS1_POCI1",
+    "UART2.CTS",
+    "TIMA0.CCP2",
+    "COMP1.OUT",
+    "TIMG7.CCP0",
+    "TIMA0.CCP1",
+    "I2C1.SDA",
+    "SYSCTL.LFXIN"
+   ],
+   "iomux_pincm": 8,
+   "modes": {
+    "PA3": 1,
+    "TIMG8.CCP0": 2,
+    "SPI0.CS1_POCI1": 3,
+    "UART2.CTS": 4,
+    "TIMA0.CCP2": 5,
+    "COMP1.OUT": 6,
+    "TIMG7.CCP0": 7,
+    "TIMA0.CCP1": 8,
+    "I2C1.SDA": 9,
+    "SYSCTL.LFXIN": 0
+   }
+  },
+  {
+   "position": "44",
+   "name": "PA4",
+   "type": "Default",
+   "signals": [
+    "PA4",
+    "TIMG8.CCP1",
+    "SPI0.POCI",
+    "UART2.RTS",
+    "TIMA0.CCP3",
+    "SYSCTL.LFCLKIN",
+    "TIMG7.CCP1",
+    "TIMA0.CCP1_CMPL",
+    "I2C1.SCL",
+    "SYSCTL.LFXOUT"
+   ],
+   "iomux_pincm": 9,
+   "modes": {
+    "PA4": 1,
+    "TIMG8.CCP1": 2,
+    "SPI0.POCI": 3,
+    "UART2.RTS": 4,
+    "TIMA0.CCP3": 5,
+    "SYSCTL.LFCLKIN": 6,
+    "TIMG7.CCP1": 7,
+    "TIMA0.CCP1_CMPL": 8,
+    "I2C1.SCL": 9,
+    "SYSCTL.LFXOUT": 0
+   }
+  },
+  {
+   "position": "45",
+   "name": "PA5",
+   "type": "Default",
+   "signals": [
+    "PA5",
+    "TIMG8.CCP0",
+    "SPI0.PICO",
+    "TIMA0.FAULT1",
+    "TIMA1.FAULT1",
+    "TIMG0.CCP0",
+    "TIMG6.CCP0",
+    "SYSCTL.FCC_IN",
+    "SYSCTL.HFXIN"
+   ],
+   "iomux_pincm": 10,
+   "modes": {
+    "PA5": 1,
+    "TIMG8.CCP0": 2,
+    "SPI0.PICO": 3,
+    "TIMA0.FAULT1": 4,
+    "TIMA1.FAULT1": 4,
+    "TIMG0.CCP0": 5,
+    "TIMG6.CCP0": 6,
+    "SYSCTL.FCC_IN": 7,
+    "SYSCTL.HFXIN": 0
+   }
+  },
+  {
+   "position": "46",
+   "name": "PA6",
+   "type": "Default",
+   "signals": [
+    "PA6",
+    "TIMG8.CCP1",
+    "SPI0.SCLK",
+    "TIMA0.FAULT0",
+    "TIMA1.FAULT0",
+    "TIMG0.CCP1",
+    "SYSCTL.HFCLKIN",
+    "TIMG6.CCP1",
+    "TIMA0.CCP2_CMPL",
+    "SYSCTL.HFXOUT"
+   ],
+   "iomux_pincm": 11,
+   "modes": {
+    "PA6": 1,
+    "TIMG8.CCP1": 2,
+    "SPI0.SCLK": 3,
+    "TIMA0.FAULT0": 4,
+    "TIMA1.FAULT0": 4,
+    "TIMG0.CCP1": 5,
+    "SYSCTL.HFCLKIN": 6,
+    "TIMG6.CCP1": 7,
+    "TIMA0.CCP2_CMPL": 8,
+    "SYSCTL.HFXOUT": 0
+   }
+  },
+  {
+   "position": "47",
+   "name": "PB0",
+   "type": "Default",
+   "signals": [
+    "PB0",
+    "UART0.TX",
+    "SPI1.CS2_POCI2",
+    "TIMA1.CCP0",
+    "TIMA0.CCP2"
+   ],
+   "iomux_pincm": 12,
+   "modes": {
+    "PB0": 1,
+    "UART0.TX": 2,
+    "SPI1.CS2_POCI2": 3,
+    "TIMA1.CCP0": 4,
+    "TIMA0.CCP2": 5
+   }
+  },
+  {
+   "position": "48",
+   "name": "PB1",
+   "type": "Default",
+   "signals": [
+    "PB1",
+    "UART0.RX",
+    "SPI1.CS3_CD_POCI3",
+    "TIMA1.CCP1",
+    "TIMA0.CCP2_CMPL"
+   ],
+   "iomux_pincm": 13,
+   "modes": {
+    "PB1": 1,
+    "UART0.RX": 2,
+    "SPI1.CS3_CD_POCI3": 3,
+    "TIMA1.CCP1": 4,
+    "TIMA0.CCP2_CMPL": 5
+   }
+  },
+  {
+   "position": "49",
+   "name": "PA7",
+   "type": "Default",
+   "signals": [
+    "PA7",
+    "COMP0.OUT",
+    "SYSCTL.CLK_OUT",
+    "TIMG8.CCP0",
+    "TIMA0.CCP2",
+    "TIMG8.IDX",
+    "TIMG7.CCP1",
+    "TIMA0.CCP1"
+   ],
+   "iomux_pincm": 14,
+   "modes": {
+    "PA7": 1,
+    "COMP0.OUT": 2,
+    "SYSCTL.CLK_OUT": 3,
+    "TIMG8.CCP0": 4,
+    "TIMA0.CCP2": 5,
+    "TIMG8.IDX": 6,
+    "TIMG7.CCP1": 7,
+    "TIMA0.CCP1": 8
+   }
+  },
+  {
+   "position": "50",
+   "name": "PB2",
+   "type": "Default",
+   "signals": [
+    "PB2",
+    "UART3.TX",
+    "UART2.CTS",
+    "I2C1.SCL",
+    "TIMA0.CCP3",
+    "UART1.CTS",
+    "TIMG6.CCP0",
+    "TIMA1.CCP0"
+   ],
+   "iomux_pincm": 15,
+   "modes": {
+    "PB2": 1,
+    "UART3.TX": 2,
+    "UART2.CTS": 3,
+    "I2C1.SCL": 4,
+    "TIMA0.CCP3": 5,
+    "UART1.CTS": 6,
+    "TIMG6.CCP0": 7,
+    "TIMA1.CCP0": 8
+   }
+  },
+  {
+   "position": "51",
+   "name": "PB3",
+   "type": "Default",
+   "signals": [
+    "PB3",
+    "UART3.RX",
+    "UART2.RTS",
+    "I2C1.SDA",
+    "TIMA0.CCP3_CMPL",
+    "UART1.RTS",
+    "TIMG6.CCP1",
+    "TIMA1.CCP1"
+   ],
+   "iomux_pincm": 16,
+   "modes": {
+    "PB3": 1,
+    "UART3.RX": 2,
+    "UART2.RTS": 3,
+    "I2C1.SDA": 4,
+    "TIMA0.CCP3_CMPL": 5,
+    "UART1.RTS": 6,
+    "TIMG6.CCP1": 7,
+    "TIMA1.CCP1": 8
+   }
+  },
+  {
+   "position": "52",
+   "name": "PB4",
+   "type": "Default",
+   "signals": [
+    "PB4",
+    "UART1.TX",
+    "UART3.CTS",
+    "TIMA1.CCP0",
+    "TIMA0.CCP2",
+    "TIMA1.CCP0_CMPL"
+   ],
+   "iomux_pincm": 17,
+   "modes": {
+    "PB4": 1,
+    "UART1.TX": 2,
+    "UART3.CTS": 3,
+    "TIMA1.CCP0": 4,
+    "TIMA0.CCP2": 5,
+    "TIMA1.CCP0_CMPL": 6
+   }
+  },
+  {
+   "position": "53",
+   "name": "PB5",
+   "type": "Default",
+   "signals": [
+    "PB5",
+    "UART1.RX",
+    "UART3.RTS",
+    "TIMA1.CCP1",
+    "TIMA0.CCP2_CMPL",
+    "TIMA1.CCP1_CMPL"
+   ],
+   "iomux_pincm": 18,
+   "modes": {
+    "PB5": 1,
+    "UART1.RX": 2,
+    "UART3.RTS": 3,
+    "TIMA1.CCP1": 4,
+    "TIMA0.CCP2_CMPL": 5,
+    "TIMA1.CCP1_CMPL": 6
+   }
+  },
+  {
+   "position": "54",
+   "name": "PA8",
+   "type": "Default",
+   "signals": [
+    "PA8",
+    "UART1.TX",
+    "SPI0.CS0",
+    "UART0.RTS",
+    "TIMA0.CCP0",
+    "TIMA1.CCP0_CMPL"
+   ],
+   "iomux_pincm": 19,
+   "modes": {
+    "PA8": 1,
+    "UART1.TX": 2,
+    "SPI0.CS0": 3,
+    "UART0.RTS": 4,
+    "TIMA0.CCP0": 5,
+    "TIMA1.CCP0_CMPL": 6
+   }
+  },
+  {
+   "position": "55",
+   "name": "PA9",
+   "type": "Default",
+   "signals": [
+    "PA9",
+    "UART1.RX",
+    "SPI0.PICO",
+    "UART0.CTS",
+    "TIMA0.CCP1",
+    "RTC.RTC_OUT",
+    "TIMA0.CCP0_CMPL",
+    "TIMA1.CCP1_CMPL",
+    "SYSCTL.CLK_OUT"
+   ],
+   "iomux_pincm": 20,
+   "modes": {
+    "PA9": 1,
+    "UART1.RX": 2,
+    "SPI0.PICO": 3,
+    "UART0.CTS": 4,
+    "TIMA0.CCP1": 5,
+    "RTC.RTC_OUT": 6,
+    "TIMA0.CCP0_CMPL": 7,
+    "TIMA1.CCP1_CMPL": 8,
+    "SYSCTL.CLK_OUT": 9
+   }
+  },
+  {
+   "position": "56",
+   "name": "PA10",
+   "type": "Default",
+   "signals": [
+    "PA10",
+    "UART0.TX",
+    "SPI0.POCI",
+    "I2C0.SDA",
+    "TIMA1.CCP0",
+    "TIMG12.CCP0",
+    "TIMA0.CCP2",
+    "I2C1.SDA",
+    "SYSCTL.CLK_OUT"
+   ],
+   "iomux_pincm": 21,
+   "modes": {
+    "PA10": 1,
+    "UART0.TX": 2,
+    "SPI0.POCI": 3,
+    "I2C0.SDA": 4,
+    "TIMA1.CCP0": 5,
+    "TIMG12.CCP0": 6,
+    "TIMA0.CCP2": 7,
+    "I2C1.SDA": 8,
+    "SYSCTL.CLK_OUT": 9
+   }
+  },
+  {
+   "position": "57",
+   "name": "PA11",
+   "type": "Default",
+   "signals": [
+    "PA11",
+    "UART0.RX",
+    "SPI0.SCLK",
+    "I2C0.SCL",
+    "TIMA1.CCP1",
+    "COMP0.OUT",
+    "TIMA0.CCP2_CMPL",
+    "I2C1.SCL"
+   ],
+   "iomux_pincm": 22,
+   "modes": {
+    "PA11": 1,
+    "UART0.RX": 2,
+    "SPI0.SCLK": 3,
+    "I2C0.SCL": 4,
+    "TIMA1.CCP1": 5,
+    "COMP0.OUT": 6,
+    "TIMA0.CCP2_CMPL": 7,
+    "I2C1.SCL": 8
+   }
+  },
+  {
+   "position": "58",
+   "name": "PB6",
+   "type": "Default",
+   "signals": [
+    "PB6",
+    "UART1.TX",
+    "SPI1.CS0",
+    "SPI0.CS1_POCI1",
+    "TIMG8.CCP0",
+    "UART2.CTS",
+    "TIMG6.CCP0",
+    "TIMA1.CCP0_CMPL"
+   ],
+   "iomux_pincm": 23,
+   "modes": {
+    "PB6": 1,
+    "UART1.TX": 2,
+    "SPI1.CS0": 3,
+    "SPI0.CS1_POCI1": 4,
+    "TIMG8.CCP0": 5,
+    "UART2.CTS": 6,
+    "TIMG6.CCP0": 7,
+    "TIMA1.CCP0_CMPL": 8
+   }
+  },
+  {
+   "position": "59",
+   "name": "PB7",
+   "type": "Default",
+   "signals": [
+    "PB7",
+    "UART1.RX",
+    "SPI1.POCI",
+    "SPI0.CS2_POCI2",
+    "TIMG8.CCP1",
+    "UART2.RTS",
+    "TIMG6.CCP1",
+    "TIMA1.CCP1_CMPL"
+   ],
+   "iomux_pincm": 24,
+   "modes": {
+    "PB7": 1,
+    "UART1.RX": 2,
+    "SPI1.POCI": 3,
+    "SPI0.CS2_POCI2": 4,
+    "TIMG8.CCP1": 5,
+    "UART2.RTS": 6,
+    "TIMG6.CCP1": 7,
+    "TIMA1.CCP1_CMPL": 8
+   }
+  },
+  {
+   "position": "60",
+   "name": "PB8",
+   "type": "Default",
+   "signals": [
+    "PB8",
+    "UART1.CTS",
+    "SPI1.PICO",
+    "TIMA0.CCP0",
+    "COMP1.OUT"
+   ],
+   "iomux_pincm": 25,
+   "modes": {
+    "PB8": 1,
+    "UART1.CTS": 2,
+    "SPI1.PICO": 3,
+    "TIMA0.CCP0": 4,
+    "COMP1.OUT": 5
+   }
+  },
+  {
+   "position": "61",
+   "name": "PB9",
+   "type": "Default",
+   "signals": [
+    "PB9",
+    "UART1.RTS",
+    "SPI1.SCLK",
+    "TIMA0.CCP1",
+    "TIMA0.CCP0_CMPL"
+   ],
+   "iomux_pincm": 26,
+   "modes": {
+    "PB9": 1,
+    "UART1.RTS": 2,
+    "SPI1.SCLK": 3,
+    "TIMA0.CCP1": 4,
+    "TIMA0.CCP0_CMPL": 5
+   }
+  },
+  {
+   "position": "62",
+   "name": "PB10",
+   "type": "Default",
+   "signals": [
+    "PB10",
+    "TIMG0.CCP0",
+    "TIMG8.CCP0",
+    "COMP1.OUT",
+    "TIMG6.CCP0"
+   ],
+   "iomux_pincm": 27,
+   "modes": {
+    "PB10": 1,
+    "TIMG0.CCP0": 2,
+    "TIMG8.CCP0": 3,
+    "COMP1.OUT": 4,
+    "TIMG6.CCP0": 5
+   }
+  },
+  {
+   "position": "63",
+   "name": "PB11",
+   "type": "Default",
+   "signals": [
+    "PB11",
+    "TIMG0.CCP1",
+    "TIMG8.CCP1",
+    "SYSCTL.CLK_OUT",
+    "TIMG6.CCP1"
+   ],
+   "iomux_pincm": 28,
+   "modes": {
+    "PB11": 1,
+    "TIMG0.CCP1": 2,
+    "TIMG8.CCP1": 3,
+    "SYSCTL.CLK_OUT": 4,
+    "TIMG6.CCP1": 5
+   }
+  },
+  {
+   "position": "64",
+   "name": "PB12",
+   "type": "Default",
+   "signals": [
+    "PB12",
+    "UART3.TX",
+    "TIMA0.CCP2",
+    "TIMA0.FAULT1",
+    "TIMA1.FAULT1",
+    "TIMA0.CCP1"
+   ],
+   "iomux_pincm": 29,
+   "modes": {
+    "PB12": 1,
+    "UART3.TX": 2,
+    "TIMA0.CCP2": 3,
+    "TIMA0.FAULT1": 4,
+    "TIMA1.FAULT1": 4,
+    "TIMA0.CCP1": 5
+   }
+  }
+ ],
+ "project": {
+  "directory": "/project",
+  "source": "sysconfig/ti_msp_dl_config.h",
+  "libxr_config": null,
+  "sysconfig_file": "mspm0g3507_minidb48.syscfg",
+  "assignments": {
+   "PA0": {
+    "signal": "UART0.TX",
+    "peripheral": "UART0",
+    "kind": "UART",
+    "function": "TX",
+    "matched": true
+   },
+   "PA1": {
+    "signal": "UART0.RX",
+    "peripheral": "UART0",
+    "kind": "UART",
+    "function": "RX",
+    "matched": true
+   },
+   "PB22": {
+    "signal": "PB22",
+    "peripheral": "GPIOB",
+    "kind": "GPIO",
+    "function": "P22",
+    "matched": true,
+    "label": "GPIO_GRP_0_PIN_0"
+   }
+  },
+  "peripherals": {
+   "GPIOB": {
+    "kind": "GPIO",
+    "pins": {
+     "P22": "PB22"
+    }
+   },
+   "UART0": {
+    "kind": "UART",
+    "pins": {
+     "RX": "PA1",
+     "TX": "PA0"
+    },
+    "sysconfig": {
+     "module": "UART",
+     "name": "UART_0",
+     "params": {
+      "enabledInterrupts": [
+       "RX",
+       "TX"
+      ],
+      "targetBaudRate": 2000000
+     }
+    },
+    "config": [
+     {
+      "section": "UART",
+      "key": "uart0",
+      "present": false
+     }
+    ]
+   }
+  }
+ }
+}

@@ -35,20 +35,20 @@ Install "XRobot" from the VS Code Marketplace, or download the `.vsix` file from
 [Releases](https://github.com/xrobot-org/xrobot-vscode-extension/releases) and use
 "Install from VSIX".
 
-扩展调用以下命令行工具，其安装方法见各自的 README：XRobot 视图需要 XRobot 1.0（`xrobot` 命令）和
+扩展调用以下命令行工具，其安装方法见各自的 README：XRobot 视图需要 xrobot 1.0（`xrobot` 命令）和
 `git`，LibXR 视图需要 libxr 6.0.0（`libxr` 命令）。扩展在 `PATH`、pip 的用户脚本目录以及设置项
 `xrobot.cli.extraPath` 中查找这些命令。
 
 The extension calls these command-line tools, installed as their READMEs describe: the XRobot view
-needs XRobot 1.0 (the `xrobot` command) and `git`, the LibXR view needs libxr 6.0.0 (the `libxr`
+needs xrobot 1.0 (the `xrobot` command) and `git`, the LibXR view needs libxr 6.0.0 (the `libxr`
 command). The commands are looked up on `PATH`, in pip's per-user script directories and in the
 `xrobot.cli.extraPath` setting.
 
-扩展 2.0.0 用于 XRobot 1.0 的 BSP。命令行工具仍是 xrobot 0.3.1 时，先将 `xrobot` 和 `libxr` 升级到上述版本
+扩展 2.0.0 用于 xrobot 1.0 的 BSP。命令行工具仍是 xrobot 0.3.1 时，先将 `xrobot` 和 `libxr` 升级到上述版本
 并迁移 BSP。暂时还要打开 0.x 的 BSP 时，在扩展页面的齿轮菜单中通过 “Install Specific Version...” 安装 1.0.1，
 并关闭本扩展的 “Auto Update”；VS Code 默认自动更新扩展，2.0.0 发布后会替换 1.0.1。
 
-Extension 2.0.0 works with XRobot 1.0 BSPs. If the command-line tools are still xrobot 0.3.1,
+Extension 2.0.0 works with xrobot 1.0 BSPs. If the command-line tools are still xrobot 0.3.1,
 first upgrade `xrobot` and `libxr` to the versions above and migrate the BSP. To keep opening
 0.x BSPs for a while, install 1.0.1 with "Install Specific Version..." in the gear menu of the
 extension page and turn off "Auto Update" for this extension; VS Code updates extensions
@@ -130,15 +130,75 @@ regenerate the header.
 
 ## 🛠 LibXR 视图 / LibXR View
 
-LibXR 视图显示工程的平台、`User/libxr_config.yaml` 中的系统与各项设置，以及 `User/flash_map.hpp`
-记录的 MCU 型号和内部 Flash 布局（按等大扇区段列出）。`libxr_config.yaml` 的值可以在视图中直接修改，
-修改后运行 `libxr gen`。视图中的操作依次对应 `libxr stm32 setup`、`libxr parse`、`libxr gen` 和
-`libxr stm32 flash-info`。
+LibXR 视图显示工程的平台和 `User/libxr_config.yaml` 中的各项设置。平台由工作区根目录识别：STM32CubeMX 的
+`.ioc` 为 STM32，`app.yaml` 加 `boards/*/*.hpmpc` 为 HPM，SysConfig 的 `.syscfg` 为 MSPM0。STM32 工程还显示
+`User/flash_map.hpp` 记录的 MCU 型号和内部 Flash 布局（按等大扇区段列出）。`libxr_config.yaml` 的值可以在视图中
+直接修改，修改后重新生成代码。"Generate LibXR Code" 依次运行 `libxr parse` 和 `libxr gen`；还没有
+`libxr_config.yaml` 时，操作是对应平台的 `libxr stm32 setup`、`libxr mspm0 setup` 或 `libxr hpm setup`。STM32 另有
+`libxr parse`、`libxr gen` 和 `libxr stm32 flash-info`。MSPM0 工程的 "Open in SysConfig" 启动独立版 SysConfig 打开
+`.syscfg`（需要 `xrobot.libxr.sysconfigTool` 和 `xrobot.libxr.mspm0SdkDir`，或同名环境变量 `SYSCONFIG_TOOL`、
+`MSPM0_SDK_INSTALL_DIR`）；HPM 工程的 "Open in HPM Pinmux Tool" 用 HPMicro 的 HPM Pinmux Tool 扩展打开 `.hpmpc`，
+没有安装该扩展时提示安装或使用网页版。
 
-The LibXR view shows the project's platform, the system and settings in `User/libxr_config.yaml`,
-and the MCU and internal Flash layout recorded in `User/flash_map.hpp`, listed as runs of equal
-sectors. Values of `libxr_config.yaml` can be edited in the view, followed by `libxr gen`. The
-view's actions are `libxr stm32 setup`, `libxr parse`, `libxr gen` and `libxr stm32 flash-info`.
+The LibXR view shows the project's platform and the settings in `User/libxr_config.yaml`. The platform is
+recognized from the workspace root: an STM32CubeMX `.ioc` is STM32, an `app.yaml` with `boards/*/*.hpmpc` is HPM, and a
+SysConfig `.syscfg` is MSPM0. An STM32 project also shows the MCU and internal Flash layout recorded in
+`User/flash_map.hpp`, listed as runs of equal sectors. Values of `libxr_config.yaml` can be edited in the view, which
+regenerates the code. Generate LibXR Code runs `libxr parse` and then `libxr gen`; while there is no `libxr_config.yaml`,
+the action is the platform's `libxr stm32 setup`, `libxr mspm0 setup` or `libxr hpm setup`. STM32 also has `libxr parse`,
+`libxr gen` and `libxr stm32 flash-info`. Open in SysConfig starts the standalone SysConfig on the `.syscfg` of an MSPM0
+project (it needs `xrobot.libxr.sysconfigTool` and `xrobot.libxr.mspm0SdkDir`, or the environment variables
+`SYSCONFIG_TOOL` and `MSPM0_SDK_INSTALL_DIR`); Open in HPM Pinmux Tool opens the `.hpmpc` of an HPM project with HPMicro's
+HPM Pinmux Tool extension, and without that extension offers to install it or to use the web tool.
+
+### 引脚布局 / Pin Layout
+
+LibXR 视图自上而下是：芯片（型号、封装、引脚数，展开后有 "Pin Layout"、来源文件和系统）、"Peripherals"（工程在 `.ioc`、
+`.syscfg` 或 `.hpmpc` 中已选的外设，按通信、定时器、模拟、存储、其他、GPIO、系统分组，GPIO 和系统
+默认折叠）、Flash 布局、配置文件、操作。"Pin Layout" 打开芯片的封装图（`libxr pins`，需要带有该命令的 libxr）。每个外设显示
+它的引脚，展开是它在 `libxr_config.yaml` 中的参数，可以直接修改（和 Config File 里一样，修改后重新生成代码）。点击一个
+外设会打开封装图并选中它：它每个功能当前用的引脚和其他可选的引脚。
+
+面板和侧栏联动：同一时间只选中一件事，要么一个引脚，要么一个外设。点封装图上的引脚，右侧显示这个引脚、项目里用作什么、
+它还能是什么；点其中的外设名（或侧栏 Peripherals 里的一项），右侧改显示这个外设：设置，以及它每个功能的引脚，封装图上
+当前用的引脚为实线、其他候选为虚线，点引脚名在封装图上定位。在面板里选中外设（或点一个已选的引脚），侧栏里对应的外设
+也被选中。
+
+封装图：滚轮以光标为中心缩放（窗口窄、图在检查器上方时，滚轮滚动页面，Ctrl+滚轮缩放），按住拖动平移，双击回到完整视图（像 CubeMX）。已选的引脚按外设类别着色，标签是引脚名加上所选功能（`PA9 USART1.TX`）或 GPIO 的标签（`PC0 ACC_CS`）；
+左上角的圆点是 1 脚。搜索框按引脚名、信号或外设（如 `usart1 tx`）高亮匹配的引脚，图例可以按类别过滤。点击引脚
+显示它能承载的外设功能（按类别折叠），点击其中的外设名选中该外设。图中列出所有识别出的外设，包括 LibXR 没有对应
+抽象的（ETH、FMC、OctoSPI 等）。MSPM0 的封装取自 SysConfig 工程（`.syscfg` 的 `--package`，或其 `--board` 对应的 LaunchPad），不用设置；`xrobot.libxr.package` 只用来覆盖它。面板本身只读。MSPM0 外设在 SysConfig 工程 `.syscfg` 中的设置（波特率、中断等）和它在 `libxr_config.yaml` 中的设置
+一起显示，前者只读，"Open in SysConfig" 启动独立版 SysConfig 修改它。
+
+The LibXR view reads, top to bottom: the chip (part, package and pins; open it for Pin Layout, the source file and the
+system), Peripherals (what the project selected in its `.ioc`, `.syscfg` or `.hpmpc`, by
+category: communication, timers, analog, memory, other, GPIO, system, with GPIO and system closed), the Flash layout, the
+config file and the actions. Pin Layout opens the package drawing of the chip (`libxr pins`, which needs a libxr release
+that has the command). Each peripheral shows its pins; open it for its settings in `libxr_config.yaml`, which can be edited
+there (as in the Config File, the code is regenerated). Clicking a peripheral opens the drawing with it selected: the pin each
+of its functions uses and the other pins that can carry it.
+
+The panel and the sidebar follow each other, and one thing is selected at a time: a pin or a peripheral. Click a pin on the
+drawing and the inspector shows the pin, what the project uses it as and what else it can be; click a peripheral name there
+(or an item of the Peripherals group in the sidebar) and the inspector shows the peripheral: its settings and the pins of each
+function, drawn solid for the pin in use and dashed for the other candidates; click a pin name to find it on the drawing.
+Selecting a peripheral in the panel (or clicking a pin the project uses) selects it in the sidebar too.
+
+The window is the chip: the drawing fills it, with the name, package and pin count written on the chip. The controls float
+over it: Search (a button that opens the field), Functions, Legend and Details, and the zoom in the bottom-right corner. The
+inspector (Details) opens beside the drawing when something is selected, and closes with Clear. The wheel zooms around the
+pointer, a drag pans and a double click shows the whole package again, as in CubeMX. Search highlights matching pins; Enter goes
+to the next match, Shift+Enter to the previous, Escape closes it. The arrow keys walk along the package once a pin is selected,
+and Escape clears the selection.
+
+In the drawing the selected pins are coloured by peripheral category and labelled with the pin name and the selected
+function (`PA9 USART1.TX`) or the label of a GPIO (`PC0 ACC_CS`); the dot in the top-left corner marks pin 1. The search
+field highlights the pins that match a pin name, signal or peripheral (such as `usart1 tx`), and the legend panel filters
+by category. Clicking a pin shows the peripheral functions it can carry, folded by category; clicking a peripheral name selects
+it. Every recognized peripheral is listed, including those LibXR has no abstraction for (ETH, FMC, OctoSPI, ...). The
+package of an MSPM0 comes from its SysConfig project (the `--package` of the `.syscfg`, or the LaunchPad its `--board` names), so nothing is set; the `xrobot.libxr.package` setting only overrides it. The panel itself is read-only. The settings of an MSPM0 peripheral in the `.syscfg` of the SysConfig project (baud rate,
+interrupts, ...) are shown read-only next to its settings in `libxr_config.yaml`; Open in SysConfig starts the standalone
+SysConfig to change them.
 
 ---
 
@@ -153,6 +213,7 @@ bars.
 | --- | --- |
 | XRobot: Refresh All | 重新读取两个视图 / Reload both views |
 | XRobot: Collapse All Views | 折叠两个视图 / Collapse both views |
+| XRobot: Show Pin Layout | 打开封装图 / Open the package drawing |
 | XRobot: Select Product (xrobot gen -c) | 选择配置并生成头文件 / Select a configuration and generate the header |
 | XRobot: Add Module Instance | 添加实例 / Add an instance |
 | XRobot: Edit Module Instance | 修改实例 / Edit an instance |
@@ -177,8 +238,11 @@ bars.
 | `xrobot.cli.extraPath` | 查找命令行工具时追加的目录（PATH 语法）/ Extra directories for finding the CLIs (PATH syntax) |
 | `xrobot.cli.pythonPath` | 找不到命令时用于运行对应 Python 模块的解释器 / Interpreter that runs the Python module when a command is not found |
 | `xrobot.libxr.iocFile` | 使用的 `.ioc` 文件，留空时取根目录下的第一个 / The `.ioc` file to use; empty takes the first one at the root |
+| `xrobot.libxr.package` | 覆盖引脚布局中的芯片封装，留空即可（MSPM0 取自 SysConfig 工程）/ Overrides the package of the chip in the pin layout; leave empty (an MSPM0 takes it from its SysConfig project) |
 | `xrobot.libxr.configPath` | `libxr_config.yaml` 的路径 / Path of `libxr_config.yaml` |
 | `xrobot.libxr.appMainPath` | `app_main.cpp` 的路径 / Path of `app_main.cpp` |
+| `xrobot.libxr.sysconfigTool` | MSPM0 用的 SysConfig 命令行工具（`SYSCONFIG_TOOL`，`sysconfig_cli.bat` 或 `sysconfig_cli.sh`），留空时用环境变量 / The SysConfig command-line tool for MSPM0 (`SYSCONFIG_TOOL`, `sysconfig_cli.bat` or `sysconfig_cli.sh`); empty uses the environment variable |
+| `xrobot.libxr.mspm0SdkDir` | MSPM0 SDK 目录（`MSPM0_SDK_INSTALL_DIR`），留空时用环境变量 / The MSPM0 SDK directory (`MSPM0_SDK_INSTALL_DIR`); empty uses the environment variable |
 
 ---
 

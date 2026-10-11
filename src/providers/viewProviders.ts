@@ -26,6 +26,11 @@ import { canSwitchConstructor, type InstanceEditTarget } from './instanceEditor'
 import { libxrArgs, xrobotArgs, type PathSegment } from '../cli/xrobotCli';
 import { describeService, getWorkspaceRoot, isXrobotBsp, reportOutcome, runLogged, type DescribeOutcome } from '../cliHost';
 import { REMOTE_VERSION_DEFAULT_LABEL } from '../uiText';
+import { detectPinsProject } from '../pins/project';
+import { pinsService, type PinsState } from '../pinsService';
+import { categoryOf, type Category, type PinsConfigEntry } from '../pins/model';
+import { usedPeripherals, type UsedPeripheral } from '../pins/view';
+import { cliActions, NO_PROJECT_MESSAGE, setupAction, sourceToolLabel, platformTitle, watcherPatterns } from '../libxrView';
 
 export type CliRunRequest = {
 	label: string;
@@ -43,16 +48,20 @@ export type OpenFileTarget = {
 	exists: boolean;
 };
 
-export type TreeNode = GroupNode | FileNode | YamlValueNode | ActionNode | UrlNode | MessageNode | OpNode;
+export type TreeNode = GroupNode | FileNode | YamlValueNode | ActionNode | UrlNode | MessageNode | OpNode | PeripheralNode;
 
 type GroupNode = {
 	type: 'group';
+	// Keeps the item (and whether it is open) across refreshes.
+	id?: string;
 	label: string;
 	children: TreeNode[];
 	expanded?: boolean;
 	description?: string;
 	iconId?: string;
 	tooltip?: string;
+	// A theme colour id for the icon.
+	color?: string;
 };
 
 type FileNode = {
@@ -106,11 +115,26 @@ type OpNode = {
 	iconId?: string;
 };
 
+// A peripheral the project selected: its pins and settings below it; clicking it opens the pin
+// layout with the peripheral selected.
+type PeripheralNode = {
+	type: 'peripheral';
+	label: string;
+	description: string;
+	// Markdown: the pins and where the settings are.
+	tooltip: string;
+	category: Category;
+	peripheral: string;
+	children: TreeNode[];
+};
+
 type WorkspaceContext = {
 	root: string;
 	iocFiles: string[];
 	selectedIoc?: string;
-	platform: 'stm32' | 'unknown';
+	platform: 'stm32' | 'mspm0' | 'hpm' | 'unknown';
+	// The .ioc, .hpmpc or .syscfg the platform was recognized from.
+	pinsSource?: string;
 	libxrConfigRel: string;
 	libxrConfigAbs: string;
 	appMainRel: string;
@@ -124,6 +148,37 @@ type WorkspaceContext = {
 export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	private readonly onDidChangeEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 	public readonly onDidChangeTreeData = this.onDidChangeEmitter.event;
+	// The parents of the nodes of the last build and the peripheral items, so one can be revealed.
+	private readonly parents = new Map<TreeNode, TreeNode>();
+	private readonly peripheralItems = new Map<string, PeripheralNode>();
+
+	getParent(element: TreeNode): TreeNode | undefined {
+		return this.parents.get(element);
+	}
+
+	// Selects the item of a peripheral in the tree (the panel selected it); the item's click
+	// command is not run. Nothing happens while the view is hidden.
+	revealPeripheral(view: vscode.TreeView<TreeNode>, name: string | null): void {
+		const node = name ? this.peripheralItems.get(name) : undefined;
+		if (!node || !view.visible) {
+			return;
+		}
+		void Promise.resolve(view.reveal(node, { select: true, focus: false, expand: false })).then(undefined, () => undefined);
+	}
+
+	private indexTree(nodes: TreeNode[], parent?: TreeNode): void {
+		for (const node of nodes) {
+			if (parent) {
+				this.parents.set(node, parent);
+			}
+			if (node.type === 'peripheral') {
+				this.peripheralItems.set(node.peripheral, node);
+			}
+			if (node.type === 'group' || node.type === 'peripheral') {
+				this.indexTree(node.children, node);
+			}
+		}
+	}
 
 	refresh(): void {
 		this.onDidChangeEmitter.fire(undefined);
@@ -140,10 +195,14 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		}
 
 		if (!element) {
-			return this.buildRoot(ctx);
+			const root = this.buildRoot(ctx);
+			this.parents.clear();
+			this.peripheralItems.clear();
+			this.indexTree(root);
+			return root;
 		}
 
-		if (element.type === 'group') {
+		if (element.type === 'group' || element.type === 'peripheral') {
 			return element.children;
 		}
 
@@ -158,35 +217,26 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 		return [];
 	}
 
+	// The LibXR view, top to bottom: the chip (its pin layout, source file and system), what the
+	// project uses (the peripherals, with their settings), then the Flash layout, the files and the
+	// actions. The chip and the peripherals come from the shared `libxr pins` result.
 	private buildRoot(ctx: WorkspaceContext): TreeNode[] {
-		if (ctx.platform !== 'stm32') {
-			return [messageNode('Unsupported platform (currently only STM32 with *.ioc in workspace root).')];
+		if (ctx.platform === 'unknown') {
+			return [
+				messageNode(NO_PROJECT_MESSAGE),
+			];
 		}
-
-		const platformItem: TreeNode =
-			ctx.platform === 'stm32' && ctx.selectedIoc
-				? fileNode(
-						`Platform: [STM32] ${path.basename(ctx.selectedIoc)}`,
-						path.join(ctx.root, ctx.selectedIoc),
-						ctx.selectedIoc,
-						'none',
-				  )
-				: messageNode('Platform: [Unknown] (need *.ioc in workspace root)');
+		const state = pinsService.state;
+		// The settings of a peripheral are edited in libxr_config.yaml (its shape is the same on
+		// every platform).
+		const settingsFile = ctx.hasLibxrConfig ? ctx.libxrConfigAbs : undefined;
 
 		if (!ctx.hasLibxrConfig) {
+			const setup = setupAction(ctx.platform, ctx.xrobotBsp);
 			return [
-				platformItem,
-				groupNode(
-					'Actions',
-					[
-						actionNode('Configure CubeMX (libxr stm32 setup)', {
-							label: 'libxr stm32 setup',
-							tool: 'libxr',
-							args: ['stm32', 'setup', '-d', '.'],
-						}),
-					],
-					false,
-				),
+				chipNode(ctx, state),
+				...peripheralsNodes(state, settingsFile, ctx.root),
+				groupNode('Actions', [actionNode(setup.label, setup.request), ...optional(vendorToolNode(ctx))], false),
 			];
 		}
 
@@ -199,15 +249,17 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 			contextValue: 'xrobot.libxr.appMainPath',
 		});
 
-		const systemItem = this.buildSystemItem(ctx);
+		// The Flash layout is an output of the STM32 generator alone; `libxr gen` for MSPM0 and
+		// HPM writes no flash_map.hpp.
+		const isStm32 = ctx.platform === 'stm32';
 		const flashLayoutNodes = this.buildFlashLayoutNodes(ctx);
 		const flashSummary = this.buildFlashLayoutSummary(ctx);
 		const flashLabel = flashSummary ? `Flash Layout: ${flashSummary}` : 'Flash Layout';
 
 		return [
-			platformItem,
-			systemItem,
-			groupNode(flashLabel, flashLayoutNodes, false),
+			chipNode(ctx, state, isStm32 ? this.buildSystemItem(ctx) : undefined),
+			...peripheralsNodes(state, settingsFile, ctx.root),
+			...(isStm32 ? [groupNode(flashLabel, flashLayoutNodes, false)] : []),
 			configItem,
 			groupNode('Actions', this.buildActions(ctx), false),
 			appMainItem,
@@ -272,55 +324,25 @@ export class LibxrTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 	}
 
 	private buildActions(ctx: WorkspaceContext): TreeNode[] {
-		const appMainArg = `./${ctx.appMainRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
 		const iocDir = ctx.selectedIoc ? path.dirname(ctx.selectedIoc).replace(/\\/g, '/') : '.';
-		const parseIocOut = stm32ParsedConfigArg();
-		const libxrConfigArg = `./${ctx.libxrConfigRel.replace(/\\/g, '/').replace(/^\.?\//, '')}`;
-		const flashModel = this.readFlashModel(ctx) ?? 'STM32F103C8';
-		const nodes: TreeNode[] = [];
-		const withXrobot = ctx.xrobotBsp;
-		const xrobotFlag = withXrobot ? ' --xrobot' : '';
-		const projectDir = iocDir === '' ? '.' : iocDir;
-
-		if (ctx.platform === 'stm32') {
-			nodes.push(
-				actionNode('Configure CubeMX (libxr stm32 setup)', {
-					label: 'libxr stm32 setup',
-					tool: 'libxr',
-					args: withXrobot ? ['stm32', 'setup', '-d', '.', '--xrobot'] : ['stm32', 'setup', '-d', '.'],
-				}),
-			);
-			nodes.push(
-				actionNode('Parse IOC (libxr parse)', {
-					label: 'libxr parse',
-					tool: 'libxr',
-					args: ['parse'],
-					promptInput: true,
-					defaultInput: `-d ${iocDir === '' ? '.' : iocDir} -o ${parseIocOut} --verbose`,
-					inputPrompt: `Example: -d <CubeMXDir> -o ${parseIocOut} --verbose`,
-				}),
-				actionNode('Generate STM32 Code (libxr gen)', {
-					label: 'libxr gen',
-					tool: 'libxr',
-					args: ['gen'],
-					promptInput: true,
-					defaultInput: `-i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
-					inputPrompt: `Example: -i ${parseIocOut} -d ${projectDir} -o ${appMainArg}${xrobotFlag} --libxr-config ${libxrConfigArg}`,
-				}),
-				actionNode('Show STM32 Flash Info (libxr stm32 flash-info)', {
-					label: 'libxr stm32 flash-info',
-					tool: 'libxr',
-					args: ['stm32', 'flash-info'],
-					promptInput: true,
-					defaultInput: flashModel,
-					inputPrompt: 'Example: STM32F103C8',
-				}),
-			);
+		// One-click generation for every platform: parse from the current project, then generate.
+		const nodes: TreeNode[] = [
+			opNode('Generate LibXR Code', 'xrobot.generateLibxrCode', [], 'parse, then generate', 'play'),
+		];
+		for (const action of cliActions({
+			platform: ctx.platform,
+			xrobotBsp: ctx.xrobotBsp,
+			appMainRel: ctx.appMainRel,
+			libxrConfigRel: ctx.libxrConfigRel,
+			projectDir: iocDir,
+			flashModel: this.readFlashModel(ctx),
+		})) {
+			nodes.push(actionNode(action.label, action.request));
 		}
-		if (nodes.length === 0) {
-			nodes.push(messageNode('No platform-specific actions (need *.ioc in workspace root)'));
+		const tool = vendorToolNode(ctx);
+		if (tool) {
+			nodes.push(tool);
 		}
-
 		return nodes;
 	}
 
@@ -407,7 +429,7 @@ export class XrobotTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
 		const tool = describe.tools.xrobot;
 		nodes.push(
-			messageNode(`XRobot ${tool.installed}`, tool.pin ? `pinned ${tool.pin}` : 'not pinned', {
+			messageNode(`xrobot ${tool.installed}`, tool.pin ? `pinned ${tool.pin}` : 'not pinned', {
 				iconId: tool.pin === tool.installed ? 'pass' : 'warning',
 			}),
 		);
@@ -692,14 +714,30 @@ function sourceLabel(url: string): string {
 }
 
 function createTreeItem(node: TreeNode): vscode.TreeItem {
+	if (node.type === 'peripheral') {
+		const item = new vscode.TreeItem(
+			node.label,
+			node.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+		);
+		item.id = `peripheral:${node.peripheral}`;
+		item.description = node.description;
+		item.tooltip = new vscode.MarkdownString(node.tooltip);
+		item.iconPath = new vscode.ThemeIcon(CATEGORY_ICONS[node.category], CATEGORY_COLORS[node.category] ? new vscode.ThemeColor(CATEGORY_COLORS[node.category]!) : undefined);
+		item.command = { command: 'xrobot.showPinLayout', title: 'Show Pin Layout', arguments: [{ peripheral: node.peripheral }] };
+		return item;
+	}
+
 	if (node.type === 'group') {
 		const item = new vscode.TreeItem(
 			node.label,
 			node.expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
 		);
+		if (node.id) {
+			item.id = node.id;
+		}
 		item.description = node.description ?? `${node.children.length} items`;
 		item.tooltip = node.tooltip;
-		item.iconPath = new vscode.ThemeIcon(node.iconId ?? groupIconId(node.label));
+		item.iconPath = new vscode.ThemeIcon(node.iconId ?? groupIconId(node.label), node.color ? new vscode.ThemeColor(node.color) : undefined);
 		return item;
 	}
 
@@ -780,9 +818,21 @@ function yamlChildrenForFile(node: FileNode): TreeNode[] {
 	if (node.label === 'Config File') {
 		const rootObj = asRecord(parsed.value);
 		if (rootObj) {
+			const shown = settingsShownInPeripherals(pinsService.state);
 			const filtered: Record<string, unknown> = {};
 			for (const [k, v] of Object.entries(rootObj)) {
 				if (k === 'SYSTEM' || k === 'FlashLayout') {
+					continue;
+				}
+				// The settings of a peripheral are edited under Peripherals: not listed twice. What
+				// the project does not use stays here, so nothing in the file is out of reach.
+				const section = shown.get(k);
+				const entries = asRecord(v);
+				if (section && entries) {
+					const rest = Object.fromEntries(Object.entries(entries).filter(([key]) => !section.has(key)));
+					if (Object.keys(rest).length > 0) {
+						filtered[k] = rest;
+					}
 					continue;
 				}
 				filtered[k] = v;
@@ -791,6 +841,36 @@ function yamlChildrenForFile(node: FileNode): TreeNode[] {
 		}
 	}
 	return toYamlValueNodes(parsed.value, 0, node.absolutePath, [], false);
+}
+
+// The sections and keys of libxr_config.yaml that the Peripherals group shows (peripherals the
+// project uses that have settings in the file), so the Config File does not list them again. Empty
+// while the shared `libxr pins` result is missing: the Config File then shows everything.
+function settingsShownInPeripherals(state: PinsState): Map<string, Set<string>> {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
+	const shown = new Map<string, Set<string>>();
+	if (!result) {
+		return shown;
+	}
+	for (const used of usedPeripherals(result)) {
+		for (const entry of used.config ?? []) {
+			if (!entry.present) {
+				continue;
+			}
+			const keys = shown.get(entry.section) ?? new Set<string>();
+			// A keyed entry hides its instance (usart1); a key-less one is a whole section (the
+			// GPIO renames of an HPM) and hides the keys its params name.
+			if (entry.key !== null) {
+				keys.add(entry.key);
+			} else {
+				for (const key of Object.keys(entry.params ?? {})) {
+					keys.add(key);
+				}
+			}
+			shown.set(entry.section, keys);
+		}
+	}
+	return shown;
 }
 
 function yamlChildrenForValue(node: YamlValueNode): TreeNode[] {
@@ -858,9 +938,9 @@ function groupNode(
 	children: TreeNode[],
 	expanded = false,
 	description?: string,
-	options?: { iconId?: string; tooltip?: string },
+	options?: { iconId?: string; tooltip?: string; id?: string; color?: string },
 ): GroupNode {
-	return { type: 'group', label, children, expanded, description, iconId: options?.iconId, tooltip: options?.tooltip };
+	return { type: 'group', id: options?.id, label, children, expanded, description, iconId: options?.iconId, tooltip: options?.tooltip, color: options?.color };
 }
 
 function fileNode(
@@ -888,6 +968,197 @@ function fileNode(
 
 function actionNode(label: string, runRequest: CliRunRequest): ActionNode {
 	return { type: 'action', label, runRequest };
+}
+
+// The pin layout panel (`libxr pins`) is a view of the chip, so it sits with the chip, not among
+// the actions.
+function pinLayoutNode(): OpNode {
+	return opNode('Pin Layout', 'xrobot.showPinLayout', [], 'package drawing', 'circuit-board');
+}
+
+// The chip of the project: its part, package and pins, and below it the pin layout, the file the
+// chip was read from and the system. While `libxr pins` runs the last result stays; when it fails the
+// CLI's own message is shown here.
+function chipNode(ctx: WorkspaceContext, state: PinsState, systemItem?: TreeNode): GroupNode {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
+	let description: string | undefined;
+	if (result) {
+		description = `${result.package} · ${result.pin_count} pins`;
+	} else if (state.status === 'running') {
+		description = 'loading…';
+	} else if (state.status === 'error') {
+		description = 'unavailable';
+	}
+	const source = ctx.pinsSource ?? '';
+	const children: TreeNode[] = [
+		pinLayoutNode(),
+		fileNode(path.basename(source), path.join(ctx.root, source), source, 'none', {
+			description: sourceToolLabel(ctx.platform),
+		}),
+	];
+	if (systemItem) {
+		children.push(systemItem);
+	}
+	if (state.status === 'error') {
+		children.push(messageNode(state.message, undefined, { iconId: 'error', tooltip: state.message }));
+	}
+	return groupNode(result ? result.part : `${platformTitle(ctx.platform)} project`, children, true, description, {
+		iconId: 'chip',
+		id: 'chip',
+	});
+}
+
+const CATEGORY_ORDER: Category[] = ['comm', 'timer', 'analog', 'memory', 'other', 'gpio', 'system'];
+
+const CATEGORY_TITLES: Record<Category, string> = {
+	comm: 'Communication',
+	timer: 'Timers',
+	analog: 'Analog',
+	gpio: 'GPIO',
+	system: 'System',
+	memory: 'Memory',
+	other: 'Other',
+};
+
+const CATEGORY_ICONS: Record<Category, string> = {
+	comm: 'plug',
+	timer: 'watch',
+	analog: 'pulse',
+	gpio: 'circle-filled',
+	system: 'gear',
+	memory: 'database',
+	other: 'circuit-board',
+};
+
+// XRobot Style: four data colours (the panel's channels), only for the four categories that have one;
+// the others keep the default icon colour.
+const CATEGORY_COLORS: Partial<Record<Category, string>> = {
+	comm: 'charts.blue',
+	timer: 'charts.yellow',
+	analog: 'charts.green',
+	gpio: 'charts.purple',
+};
+
+// What the pins of a peripheral say in one line: the first three, then how many more.
+function pinsSummary(used: UsedPeripheral): string {
+	const shown = used.pins.slice(0, 3).map((pin) => `${pin.function} ${pin.pin}`);
+	const more = used.pins.length - shown.length;
+	return more > 0 ? `${shown.join(' · ')} · +${more}` : shown.join(' · ');
+}
+
+// A value of a SysConfig setting in one line.
+function settingText(value: unknown): string {
+	return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+}
+
+// Where the settings of a config entry live in libxr_config.yaml, such as "USART.usart1" or,
+// for a key-less entry, the section itself ("GPIO").
+function configLabel(entry: PinsConfigEntry): string {
+	return entry.key === null ? entry.section : `${entry.section}.${entry.key}`;
+}
+
+function peripheralTooltip(used: UsedPeripheral): string {
+	const lines = [`**${used.name}** · ${used.kind}`, ''];
+	for (const pin of used.pins) {
+		lines.push(`- ${pin.function}: \`${pin.pin}\``);
+	}
+	if (used.sysconfig) {
+		lines.push('', `SysConfig: \`${used.sysconfig.name ?? used.sysconfig.module}\``);
+	}
+	for (const entry of used.config ?? []) {
+		lines.push('', entry.present ? `Settings: \`${configLabel(entry)}\`` : `Not in libxr_config.yaml (\`${configLabel(entry)}\`)`);
+	}
+	return lines.join('\n');
+}
+
+// A peripheral the project selected. Its settings in libxr_config.yaml are its children and can be
+// edited like the Config File (settingsFile), which regenerates the code. An MSPM0 also shows the
+// settings of its SysConfig project, which are read-only here.
+function peripheralNode(used: UsedPeripheral, settingsFile?: string, sysconfigFile?: string): PeripheralNode {
+	let children: TreeNode[] = [];
+	if (used.sysconfig) {
+		children = Object.entries(used.sysconfig.params).map(([name, value]) =>
+			messageNode(`${name}: ${settingText(value)}`, undefined, { iconId: 'symbol-field' }),
+		);
+	}
+	let editable = false;
+	// Several channels of one timer (an MSPM0 TIMA, an HPM GPTMR) carry the same parameter
+	// names, so each row is prefixed with its key when more than one is shown.
+	// A key-less entry is a whole section of pin renames (HPM GPIO): its pins are editable even
+	// before the section exists, because writing one creates it.
+	const editableEntry = (entry: PinsConfigEntry): boolean => Boolean(settingsFile) && (entry.present || entry.key === null);
+	const shown = (used.config ?? []).filter(editableEntry);
+	for (const entry of used.config ?? []) {
+		if (editableEntry(entry)) {
+			if (used.sysconfig && !editable) {
+				children.push(messageNode('libxr_config.yaml:', undefined, { iconId: 'settings' }));
+			}
+			const base = entry.key === null ? [entry.section] : [entry.section, entry.key];
+			const prefix = entry.key === null || shown.length < 2 ? '' : `${entry.key}.`;
+			children.push(
+				...toYamlValueNodes(entry.params ?? {}, 0, settingsFile as string, base, true).map((node) =>
+					prefix && node.type === 'yamlValue' ? { ...node, label: `${prefix}${node.label}` } : node,
+				),
+			);
+			editable = true;
+		} else if (!entry.present) {
+			children.push(messageNode(`Not in libxr_config.yaml yet (${configLabel(entry)})`, undefined, { iconId: 'info' }));
+		}
+	}
+	if (used.sysconfig && sysconfigFile) {
+		children.push(opNode('Open in SysConfig', 'xrobot.openVendorTool', ['mspm0', sysconfigFile], path.basename(sysconfigFile), 'go-to-file'));
+	}
+	const status = used.config?.length && !used.config.some((entry) => entry.present) ? 'not configured' : '';
+	return {
+		type: 'peripheral',
+		label: used.name,
+		description: [pinsSummary(used), status].filter(Boolean).join(' · '),
+		tooltip: peripheralTooltip(used),
+		category: used.category,
+		peripheral: used.name,
+		children,
+	};
+}
+
+// The peripherals the project selected, by category, from the shared `libxr pins` result. Nothing
+// while there is no result (the chip says why).
+function peripheralsNodes(state: PinsState, settingsFile?: string, root?: string): TreeNode[] {
+	const result = state.status === 'ok' ? state.result : state.status === 'running' ? state.previous : undefined;
+	if (!result) {
+		return [];
+	}
+	const used = usedPeripherals(result);
+	if (used.length === 0) {
+		return [messageNode('Peripherals: the project selects none', undefined, { iconId: 'info' })];
+	}
+	const sysconfigFile = root && result.project?.sysconfig_file ? path.join(root, result.project.sysconfig_file) : undefined;
+	const groups = CATEGORY_ORDER.map((category) => {
+		const members = used.filter((peripheral) => peripheral.category === category);
+		// GPIO and system pins are many and rarely what one looks for: they start closed.
+		return members.length === 0
+			? undefined
+			: groupNode(
+					CATEGORY_TITLES[category],
+					members.map((peripheral) => peripheralNode(peripheral, settingsFile, sysconfigFile)),
+					category !== 'gpio' && category !== 'system',
+					String(members.length),
+					{ iconId: CATEGORY_ICONS[category], id: `peripherals:${category}`, color: CATEGORY_COLORS[category] },
+			  );
+	}).filter((group): group is GroupNode => group !== undefined);
+	return [groupNode('Peripherals', groups, true, `${used.length}`, { iconId: 'symbol-interface', id: 'peripherals' })];
+}
+
+// The action that opens an MSPM0 .syscfg in SysConfig or an HPM .hpmpc in the HPM Pinmux Tool.
+function vendorToolNode(ctx: WorkspaceContext): OpNode | undefined {
+	if ((ctx.platform !== 'mspm0' && ctx.platform !== 'hpm') || !ctx.pinsSource) {
+		return undefined;
+	}
+	const label = ctx.platform === 'mspm0' ? 'Open in SysConfig' : 'Open in HPM Pinmux Tool';
+	return opNode(label, 'xrobot.openVendorTool', [ctx.platform, ctx.pinsSource], path.basename(ctx.pinsSource), 'link-external');
+}
+
+function optional<T>(value: T | undefined): T[] {
+	return value === undefined ? [] : [value];
 }
 
 function opNode(label: string, command: string, args: unknown[] = [], description?: string, iconId?: string): OpNode {
@@ -976,12 +1247,14 @@ function getWorkspaceContext(): WorkspaceContext | undefined {
 	const iocFiles = detectIocFiles(root);
 	const selectedIoc = resolveIocFile(root, iocFiles);
 	const libxrConfig = resolveLibxrConfig(root);
+	const pinsProject = detectPinsProject(root, selectedIoc ? [selectedIoc] : []);
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp');
 	return {
 		root,
 		iocFiles,
 		selectedIoc,
-		platform: selectedIoc ? 'stm32' : 'unknown',
+		platform: pinsProject?.platform ?? 'unknown',
+		pinsSource: pinsProject?.source,
 		libxrConfigRel: libxrConfig.selectedRel,
 		libxrConfigAbs: path.join(root, libxrConfig.selectedRel),
 		libxrConfigCandidates: libxrConfig.candidates,
@@ -1066,7 +1339,19 @@ export async function editYamlScalar(filePath?: string, keyPath?: Array<string |
 	if (input === undefined || input === currentText) {
 		return;
 	}
-	doc.setIn(keyPath, parseScalarInput(input));
+	try {
+		// A section written as `GPIO:` (null) is not a map yet: it becomes one.
+		for (let depth = 1; depth < keyPath.length; depth++) {
+			const parent = doc.getIn(keyPath.slice(0, depth));
+			if (parent === null || parent === undefined) {
+				doc.setIn(keyPath.slice(0, depth), doc.createNode({}));
+			}
+		}
+		doc.setIn(keyPath, parseScalarInput(input));
+	} catch (error) {
+		void vscode.window.showErrorMessage(`Cannot edit ${keyPath.join('.')} in ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+		return;
+	}
 	try {
 		fs.writeFileSync(filePath, doc.toString(), 'utf8');
 	} catch (error) {
@@ -1111,13 +1396,20 @@ function normalizePath(p: string): string {
 }
 
 // `libxr gen` reads the .config.yaml that `libxr parse` writes. That file is ignored by Git,
-// so a fresh clone has none and parse runs first.
-async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
+// so a fresh clone has none and parse runs first. The parse and gen detect the platform by the
+// project directory, so this works for STM32, MSPM0 and HPM alike.
+export async function runLibxrGenerateCodeFromCurrent(): Promise<void> {
 	const root = getWorkspaceRoot();
 	if (!root) {
 		return;
 	}
 	const ioc = resolveIocFile(root, detectIocFiles(root));
+	// From the Command Palette the workspace may hold no project at all: say so instead of
+	// running the CLI into its own "no platform" error.
+	if (!detectPinsProject(root, ioc ? [ioc] : [])) {
+		void vscode.window.showInformationMessage(NO_PROJECT_MESSAGE);
+		return;
+	}
 	const projectDir = ioc ? path.dirname(ioc).replace(/\\/g, '/') : '.';
 	const appMainRel = getWorkspaceRelativeConfig('xrobot.libxr.appMainPath', 'User/app_main.cpp').replace(/\\/g, '/');
 	const libxrConfigRel = getWorkspaceRelativeConfig('xrobot.libxr.configPath', 'User/libxr_config.yaml').replace(/\\/g, '/');
@@ -1237,16 +1529,8 @@ export function registerWatchers(context: vscode.ExtensionContext, refreshAll: (
 		return;
 	}
 
-	// Inputs of `xrobot describe` (configs, requests, sources, lock, generated header, the
-	// entry source with its XR_REGISTER lines) and of the LibXR view.
-	const patterns = [
-		'*.ioc',
-		'Modules/modules.yaml',
-		'Modules/sources.yaml',
-		'xrobot.lock',
-		'User/**/*.{yaml,yml}',
-		'User/**/*.{c,cc,cpp,cxx,hpp}',
-	];
+	// The files the two views follow come from libxrView.ts (watcherPatterns).
+	const patterns = watcherPatterns();
 
 	for (const p of patterns) {
 		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, p));

@@ -22,7 +22,7 @@ import {
 } from '../../providers/describeModel';
 
 // Trimmed from real `xrobot describe -c User/RobotConfig/hero.yaml` output (bsp-dev-c,
-// XRobot 1.0.0, schema 1).
+// xrobot 1.0.0, schema 1).
 const FIXTURE = fs.readFileSync(path.resolve(__dirname, '../../../src/test/unit/fixtures/describe-hero.json'), 'utf8');
 
 function load(): DescribeResult {
